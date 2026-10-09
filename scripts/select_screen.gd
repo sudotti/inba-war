@@ -26,11 +26,11 @@ var _is_portrait := false
 var _main_margin: MarginContainer
 var _main_container: Control
 var _rebuild_pending := false
+var _orientation_timer := 0.0
 
 
 func _ready() -> void:
-	# Initial orientation from viewport (fixed by stretch mode)
-	_is_portrait = UiFont.portrait(get_viewport().get_visible_rect().size)
+	_is_portrait = _get_current_orientation()
 
 	# Persistent background
 	var night := ColorRect.new()
@@ -53,20 +53,18 @@ func _ready() -> void:
 	_main_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_main_margin.add_child(_main_container)
 
-	# Connect to viewport size changed for actual orientation changes
-	get_viewport().size_changed.connect(_on_viewport_resized)
-
 	_fill()
 	_build_closet()
 
 
-func _on_viewport_resized() -> void:
-	if _rebuild_pending:
+func _process(delta: float) -> void:
+	_orientation_timer -= delta
+	if _orientation_timer > 0.0:
 		return
-	# Viewport size changed (happens when stretch mode allows it)
-	var new_portrait := UiFont.portrait(get_viewport().get_visible_rect().size)
-	if new_portrait != _is_portrait:
-		_is_portrait = new_portrait
+	var current := _get_current_orientation()
+	if current != _is_portrait and not _rebuild_pending:
+		_is_portrait = current
+		_orientation_timer = 0.5  # Debounce
 		_rebuild_pending = true
 		call_deferred("_do_refill")
 
@@ -80,6 +78,33 @@ func _do_refill() -> void:
 	SafeArea.apply_safe_padding(_main_margin, get_viewport())
 	_fill()
 	_rebuild_pending = false
+
+
+func _get_current_orientation() -> bool:
+	# Get actual window size (not viewport)
+	var win_size := Vector2.ZERO
+	
+	# Web: use JavaScript to get browser window size
+	if OS.get_name() == "Web":
+		var js_result := JavaScript.eval("window.innerWidth + ',' + window.innerHeight")
+		if js_result is String:
+			var parts := js_result.split(",")
+			if parts.size() == 2:
+				win_size = Vector2(int(parts[0]), int(parts[1]))
+	
+	# Desktop: use DisplayServer
+	if win_size == Vector2.ZERO:
+		var methods := DisplayServer.get_method_list()
+		for m in methods:
+			if m.name == "window_get_size":
+				win_size = DisplayServer.window_get_size()
+				break
+	
+	# Fallback to viewport (fixed size in stretch mode)
+	if win_size == Vector2.ZERO:
+		win_size = get_viewport().get_visible_rect().size
+	
+	return win_size.y > win_size.x
 
 
 func _fill() -> void:
@@ -105,7 +130,6 @@ func _fill() -> void:
 		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		content.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		scroll.add_child(content)
-		# No custom_minimum_size.x - let size_flags_horizontal=EXPAND_FILL handle width
 
 		for who in ORDER:
 			var card = _card(who)
