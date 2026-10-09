@@ -1,27 +1,35 @@
 extends RefCounted
 class_name UiFont
 
-const FONT_PATH := "res://assets/fonts/NotoSansJP-Bold.ttf"
+const FONT_PATH := "res://assets/fonts/NotoSerifJP-Light.ttf"
 
 const INK := Color("1c1814")
 const PAPER := Color("f4ecdf")
 const CREAM := Color("d9ccb8")
-const NIGHT := Color("14110e")
-const CARD := Color("221c17")
-const BRASS := Color("d7b072")
+const NIGHT := Color("0b0b0f")
+const CARD := Color("141414")
+const BRASS := Color("d8b26c")
 const BRASS_DEEP := Color("a68448")
 const EMBER := Color("d4654a")
 const PINK := EMBER
 const CYAN := NIGHT
-const GRASS := Color("2a241c")
-const GRASS_DARK := Color("1a1612")
+const GRASS := Color("181818")
+const GRASS_DARK := Color("0f0f0f")
 const YELLOW := BRASS
-const NAVY := Color("14110e")
-const ROYAL := Color("101c46")
-const ROYAL_DEEP := Color("0a1030")
-const GOLD := Color("f0c75e")
+const NAVY := Color("0f0f12")
+const ROYAL := Color("1a1a22")
+const ROYAL_DEEP := Color("050505")
+const GOLD := Color("f0d28a")
 
 static var _font: Font
+
+
+static func glass_fill(alpha: float = 0.22) -> Color:
+	return Color(0.12, 0.12, 0.16, alpha)
+
+
+static func glass_border(alpha: float = 0.85) -> Color:
+	return Color(1.0, 0.87, 0.55, alpha)
 
 
 static func cropped(path: String) -> Texture2D:
@@ -93,24 +101,24 @@ static func royal_button(text: String, size: int = 24, primary: bool = false) ->
 	node.text = text
 	node.add_theme_font_override("font", font())
 	node.add_theme_font_size_override("font_size", size)
-	var text_color := PAPER if not primary else INK
+	var text_color := PAPER if not primary else Color("1c1814")
 	node.add_theme_color_override("font_color", text_color)
 	node.add_theme_color_override("font_hover_color", text_color)
 	node.add_theme_color_override("font_pressed_color", text_color)
 	node.add_theme_color_override("font_focus_color", text_color)
 	node.add_theme_color_override("font_disabled_color", Color("5c564c"))
 	if primary:
-		node.add_theme_stylebox_override("normal", style(GOLD, Color("fff0c2"), 3, 14))
-		node.add_theme_stylebox_override("hover", style(Color("ffe08a"), Color("fff0c2"), 3, 14))
-		node.add_theme_stylebox_override("pressed", style(Color("e2b45a"), BRASS, 3, 14))
-		node.add_theme_stylebox_override("focus", style(GOLD, Color("fff0c2"), 3, 14))
+		node.add_theme_stylebox_override("normal", style(glass_fill(0.32), glass_border(0.95), 1, 12))
+		node.add_theme_stylebox_override("hover", style(glass_fill(0.48), Color("fff0c2"), 1, 12))
+		node.add_theme_stylebox_override("pressed", style(glass_fill(0.18), glass_border(0.7), 1, 12))
+		node.add_theme_stylebox_override("focus", style(glass_fill(0.32), glass_border(0.95), 1, 12))
 	else:
-		node.add_theme_stylebox_override("normal", style(ROYAL, BRASS, 3, 14))
-		node.add_theme_stylebox_override("hover", style(Color("26346e"), GOLD, 3, 14))
-		node.add_theme_stylebox_override("pressed", style(Color("1a2650"), BRASS, 3, 14))
-		node.add_theme_stylebox_override("focus", style(ROYAL, BRASS, 3, 14))
-	node.add_theme_stylebox_override("disabled", style(Color("3a342c"), Color("3a342c"), 3, 14))
-	node.custom_minimum_size = Vector2(240, 68)
+		node.add_theme_stylebox_override("normal", style(glass_fill(0.18), glass_border(0.8), 1, 12))
+		node.add_theme_stylebox_override("hover", style(glass_fill(0.32), Color("fff0c2"), 1, 12))
+		node.add_theme_stylebox_override("pressed", style(glass_fill(0.1), glass_border(0.6), 1, 12))
+		node.add_theme_stylebox_override("focus", style(glass_fill(0.18), glass_border(0.8), 1, 12))
+	node.add_theme_stylebox_override("disabled", style(Color("151515"), Color("333333"), 1, 12))
+	node.custom_minimum_size = Vector2(240, 64)
 	return node
 
 

@@ -3,7 +3,7 @@ extends Control
 const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
 
-const POSTER := "res://assets/ui/title_trio.png"
+const HERO := "res://assets/battle/massa.png"
 
 var _lights: Array[Dictionary] = []
 var _t := 0.0
@@ -42,16 +42,9 @@ func _build() -> void:
 	_seed_lights()
 	_build_background()
 	_build_fx()
-	if _portrait:
-		_build_title_portrait()
-		_build_poster_portrait()
-		_build_stats(0.555, 0.665)
-		_build_menu_portrait()
-	else:
-		_build_poster_landscape()
-		_build_title_landscape()
-		_build_stats(0.245, 0.305)
-		_build_menu_landscape()
+	_build_title_portrait()
+	_build_hero()
+	_build_menu_vertical(0.56, 0.98)
 
 
 func _seed_lights() -> void:
@@ -69,9 +62,9 @@ func _seed_lights() -> void:
 
 func _build_background() -> void:
 	var grad := Gradient.new()
-	grad.add_point(0.0, UiFont.ROYAL_DEEP)
-	grad.add_point(0.45, UiFont.ROYAL)
-	grad.add_point(1.0, UiFont.ROYAL_DEEP)
+	grad.add_point(0.0, Color(0.02, 0.02, 0.04, 1.0))
+	grad.add_point(0.5, Color(0.05, 0.05, 0.08, 1.0))
+	grad.add_point(1.0, Color(0.02, 0.02, 0.04, 1.0))
 	var tex := GradientTexture1D.new()
 	tex.gradient = grad
 	tex.width = 512
@@ -92,38 +85,6 @@ func _build_fx() -> void:
 	add_child(fx)
 
 
-func _build_poster_landscape() -> void:
-	var poster := TextureRect.new()
-	poster.texture = load(POSTER)
-	poster.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	poster.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	poster.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(poster)
-	add_child(poster)
-	var scrim := TextureRect.new()
-	scrim.texture = _scrim_texture()
-	scrim.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	scrim.stretch_mode = TextureRect.STRETCH_SCALE
-	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(scrim)
-	add_child(scrim)
-
-
-func _build_poster_portrait() -> void:
-	var panel := GoldFrame.new()
-	panel.fill = Color(0.04, 0.06, 0.18, 0.6)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(panel, 0.05, 0.17, 0.95, 0.55)
-	add_child(panel)
-	var poster := TextureRect.new()
-	poster.texture = load(POSTER)
-	poster.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	poster.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	poster.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(poster, 0.03, 0.03, 0.97, 0.97)
-	panel.add_child(poster)
-
-
 func _scrim_texture() -> GradientTexture1D:
 	var grad := Gradient.new()
 	grad.add_point(0.0, Color(0.03, 0.05, 0.16, 0.94))
@@ -135,27 +96,6 @@ func _scrim_texture() -> GradientTexture1D:
 	tex.gradient = grad
 	tex.width = 512
 	return tex
-
-
-func _build_title_landscape() -> void:
-	var panel := GoldFrame.new()
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(panel, 0.27, 0.05, 0.73, 0.21)
-	add_child(panel)
-	var col := VBoxContainer.new()
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_theme_constant_override("separation", 4)
-	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(col)
-	panel.add_child(col)
-	var title := UiFont.label(Balance.TITLE, 58, UiFont.GOLD)
-	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(title)
-	var subtitle := UiFont.label("校庭に、三分の決戦。", 21, UiFont.CREAM)
-	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(subtitle)
 
 
 func _build_title_portrait() -> void:
@@ -173,47 +113,13 @@ func _build_title_portrait() -> void:
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(title)
-	var subtitle := UiFont.label("校庭に、三分の決戦。", 16, UiFont.CREAM)
-	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(subtitle)
+	var subtitle := UiFont.label("迫り来る敵の魔の手から、印旛中を守れ！", 16, UiFont.CREAM)
+  subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+  subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+  col.add_child(subtitle)
 
 
-func _build_stats(top: float, bottom: float) -> void:
-	var band := GoldFrame.new()
-	band.fill = Color(0.04, 0.06, 0.18, 0.78)
-	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(band, 0.24 if not _portrait else 0.12, top, 0.76 if not _portrait else 0.88, bottom)
-	add_child(band)
-	var body: Control
-	if _portrait:
-		var col := VBoxContainer.new()
-		col.alignment = BoxContainer.ALIGNMENT_CENTER
-		col.add_theme_constant_override("separation", 2)
-		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		UiFont.full_rect(col)
-		body = col
-	else:
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 48)
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		UiFont.full_rect(row)
-		body = row
-	band.add_child(body)
-	var name_button := _name_button()
-	body.add_child(name_button)
-	var best := int(SaveStore.data.get("best_score", 0))
-	var when := str(SaveStore.data.get("best_datetime", ""))
-	var best_text := "自己ベスト  記録なし" if when == "" else "自己ベスト  %d" % best
-	var size := 22 if not _portrait else 18
-	var best_label := UiFont.label(best_text, size, UiFont.PAPER)
-	best_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	body.add_child(best_label)
-	var yen := int(SaveStore.data.get("yen", 0))
-	var yen_label := UiFont.label("所持金  %d イェン" % yen, size, UiFont.GOLD)
-	yen_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	body.add_child(yen_label)
+
 
 
 func _name_button() -> Button:
@@ -314,34 +220,24 @@ func _close_name_entry() -> void:
 		_name_panel.visible = false
 
 
-func _build_menu_landscape() -> void:
-	var menu := HBoxContainer.new()
-	menu.alignment = BoxContainer.ALIGNMENT_CENTER
-	menu.add_theme_constant_override("separation", 18)
-	UiFont.place(menu, 0.06, 0.875, 0.94, 0.985)
-	add_child(menu)
-	var avail := get_viewport_rect().size.x * 0.88
-	var width := clampf((avail - 54.0) / 4.0, 120.0, 230.0)
-	for item in _menu_items():
-		var button := UiFont.royal_button(str(item[0]), 24, bool(item[1]))
-		button.custom_minimum_size = Vector2(width, 64)
-		button.pressed.connect(item[2])
-		menu.add_child(button)
 
 
-func _build_menu_portrait() -> void:
+
+
+
+
+func _build_menu_vertical(top: float, bottom: float) -> void:
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_theme_constant_override("separation", 8)
-	UiFont.place(col, 0.08, 0.685, 0.92, 0.99)
+	col.add_theme_constant_override("separation", 10)
+	UiFont.place(col, 0.08, top, 0.92, bottom)
 	add_child(col)
 	for item in _menu_items():
-		var button := UiFont.royal_button(str(item[0]), 22, bool(item[1]))
-		button.custom_minimum_size = Vector2(0, 58)
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.pressed.connect(item[2])
-		col.add_child(button)
-
+		var btn := UiFont.royal_button(str(item[0]), 22, bool(item[1]))
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.custom_minimum_size = Vector2(0, 56)
+		btn.pressed.connect(item[2])
+		col.add_child(btn)
 
 func _menu_items() -> Array:
 	return [
@@ -390,25 +286,25 @@ class Sparkles extends Control:
 
 
 class GoldFrame extends Control:
-	var fill: Color = Color(0.05, 0.07, 0.20, 0.86)
-	var gold := UiFont.BRASS
-	var gold_bright := UiFont.GOLD
+	var fill: Color = Color(0.08, 0.08, 0.12, 0.48)
+	var gold := Color(1.0, 0.88, 0.58, 0.9)
+	var gold_bright := Color(1.0, 0.92, 0.66, 1.0)
 
 
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		draw_rect(r, fill, true)
-		draw_rect(r, gold, false, 3.0)
-		var inner := r.grow(-9.0)
-		draw_rect(inner, gold, false, 1.5)
+		draw_rect(r, gold, false, 1.5)
+		var inner := r.grow(-6.0)
+		draw_rect(inner, Color(1.0, 0.9, 0.6, 0.25), false, 0.5)
 		for corner in [Vector2.ZERO, Vector2(size.x, 0.0), Vector2(0.0, size.y), Vector2(size.x, size.y)]:
 			var c := Vector2(
-				clampf(corner.x, 12.0, size.x - 12.0),
-				clampf(corner.y, 12.0, size.y - 12.0)
+				clampf(corner.x, 8.0, size.x - 8.0),
+				clampf(corner.y, 8.0, size.y - 8.0)
 			)
 			draw_colored_polygon(PackedVector2Array([
-				c + Vector2(0.0, -10.0),
-				c + Vector2(10.0, 0.0),
-				c + Vector2(0.0, 10.0),
-				c + Vector2(-10.0, 0.0),
+				c + Vector2(0.0, -6.0),
+				c + Vector2(6.0, 0.0),
+				c + Vector2(0.0, 6.0),
+				c + Vector2(-6.0, 0.0)
 			]), gold_bright)

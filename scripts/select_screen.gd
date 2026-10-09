@@ -23,7 +23,7 @@ func _ready() -> void:
 	_is_portrait = UiFont.portrait(get_viewport_rect().size)
 	UiFont.full_rect(self)
 	var night := ColorRect.new()
-	night.color = UiFont.NIGHT
+	night.color = Color(0.03,0.03,0.06,1.0)
 	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.full_rect(night)
 	add_child(night)
@@ -59,14 +59,14 @@ func _ready() -> void:
 		for who in ORDER:
 			row.add_child(_card(who))
 
-	var back := UiFont.button("戻る", 24)
+	var back := UiFont.royal_button("戻る", 24, false)
 	back.custom_minimum_size = Vector2(240, 64)
 	UiFont.place(back, 0.04, 0.86, 0.28 if not _is_portrait else 0.44, 0.97)
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/title.tscn")
 	)
 	add_child(back)
-	var shop := UiFont.button("商店", 24)
+	var shop := UiFont.royal_button("商店", 24, false)
 	shop.custom_minimum_size = Vector2(280, 64)
 	UiFont.place(shop, 0.68 if not _is_portrait else 0.56, 0.86, 0.96, 0.97)
 	shop.pressed.connect(_open_shop)
@@ -84,7 +84,7 @@ func _card(who: String) -> Control:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var border := UiFont.BRASS if who == SaveStore.playable_character() else Color("3a3228")
-	panel.add_theme_stylebox_override("panel", UiFont.style(UiFont.CARD, border, 2, 16))
+	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.1,0.1,0.14,0.42), UiFont.glass_border(0.85), 1, 14))
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)
 	margin.add_theme_constant_override("margin_right", 16)

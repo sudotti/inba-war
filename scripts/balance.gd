@@ -72,19 +72,22 @@ const KIND_FAST := "fast"
 const KIND_TANK := "tank"
 const KIND_NIMOTON := "boss_nimoton"
 const KIND_KASSEN := "boss_kassen"
+const KIND_TEACHER := "teacher"
 const BOSS_KINDS: Array[String] = [KIND_NIMOTON, KIND_KASSEN]
+const RAID_KINDS: Array[String] = [KIND_TEACHER]
 const BOSS_SPAWN_CHANCE := 0.12
 const BOSS_NAME := {
 	KIND_NIMOTON: "ニーモトン",
 	KIND_KASSEN: "カッセン",
 }
-const ENEMY_KINDS: Array[String] = [KIND_NORMAL, KIND_FAST, KIND_TANK, KIND_NIMOTON, KIND_KASSEN]
+const ENEMY_KINDS: Array[String] = [KIND_NORMAL, KIND_FAST, KIND_TANK, KIND_NIMOTON, KIND_KASSEN, KIND_TEACHER]
 const ENEMY_KILL_SUMMARY := {
 	KIND_NORMAL: "kills_normal",
 	KIND_FAST: "kills_fast",
 	KIND_TANK: "kills_tank",
 	KIND_NIMOTON: "kills_nimoton",
 	KIND_KASSEN: "kills_kassen",
+	KIND_TEACHER: "kills_teacher",
 }
 const ENEMY_NAME := {
 	KIND_NORMAL: "黒服の手下",
@@ -92,6 +95,7 @@ const ENEMY_NAME := {
 	KIND_TANK: "印旛沼の怪獣",
 	KIND_NIMOTON: "ニーモトン",
 	KIND_KASSEN: "カッセン",
+	KIND_TEACHER: "先生",
 }
 const ENEMY_DESCRIPTION := {
 	KIND_NORMAL: "数で迫る黒服。囲まれる前に距離を取れ。",
@@ -99,6 +103,10 @@ const ENEMY_DESCRIPTION := {
 	KIND_TANK: "巨体と一撃が脅威。吹き飛ばしにくい。",
 	KIND_NIMOTON: "毒液で地面を侵し、手下を覚醒させる。",
 	KIND_KASSEN: "バレーボール弾と強烈な蹴りで襲う。",
+	KIND_TEACHER: "校庭に乱入。教鞭を振り回し、スライディングで突っ込む。",
+}
+const ENEMY_SPECIAL := {
+	KIND_TEACHER: "スライディング突進",
 }
 const BOSS_POISON := "poison"
 const BOSS_VOLLEY := "volley"
@@ -106,6 +114,11 @@ const BOSS_SPECIAL := {
 	KIND_NIMOTON: "毒液シャワー",
 	KIND_KASSEN: "バレーボール弾",
 }
+const RAID_SPAWN_FIRST := 60.0
+const RAID_SPAWN_INTERVAL := 40.0
+const TANK_SPAWN_FIRST := 75.0
+const TANK_SPAWN_INTERVAL := 50.0
+const TANK_SPAWN_CHANCE := 0.05
 
 const BUTTO := "buttobashi"
 const ONIGIRI := "onigiri"
