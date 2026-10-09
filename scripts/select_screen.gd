@@ -146,8 +146,6 @@ func _card(who: String) -> Control:
 
 	if _is_portrait:
 		var picture := _portrait_picture(who)
-		picture.custom_minimum_size = Vector2(0, 200)
-		picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_child(picture)
 	else:
 		var picture := TextureRect.new()
@@ -155,8 +153,8 @@ func _card(who: String) -> Control:
 		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		picture.custom_minimum_size = Vector2(0, 150)
-		picture.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		picture.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		col.add_child(picture)
 		_pictures[who] = picture
@@ -190,7 +188,9 @@ func _portrait_picture(who: String) -> TextureRect:
 	picture.texture = _portrait(who)
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	picture.custom_minimum_size = Vector2(140, 140)
+	picture.custom_minimum_size = Vector2(0, 200)
+	picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	picture.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_pictures[who] = picture
 	return picture
