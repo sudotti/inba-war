@@ -34,16 +34,17 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 18)
-	UiFont.place(row, 0.04, 0.14, 0.96, 0.84)
-	add_child(row)
+	var center := CenterContainer.new()
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.place(center, 0.04, 0.14, 0.96, 0.84)
+	add_child(center)
+
 	if _is_portrait:
 		var scroll := ScrollContainer.new()
 		scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		UiFont.full_rect(scroll)
-		row.add_child(scroll)
+		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_ENABLED
+		center.add_child(scroll)
 		var list := VBoxContainer.new()
 		list.add_theme_constant_override("separation", 10)
 		list.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -52,6 +53,10 @@ func _ready() -> void:
 		for who in ORDER:
 			list.add_child(_card(who))
 	else:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 18)
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		center.add_child(row)
 		for who in ORDER:
 			row.add_child(_card(who))
 
@@ -71,7 +76,7 @@ func _ready() -> void:
 func _card(who: String) -> Control:
 	var playable := SaveStore.is_playable(who)
 	var panel := PanelContainer.new()
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(300, 0)
 	var border := UiFont.BRASS if who == SaveStore.playable_character() else Color("3a3228")
 	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.1,0.1,0.14,0.42), UiFont.glass_border(0.85), 1, 14))
 	var margin := MarginContainer.new()
