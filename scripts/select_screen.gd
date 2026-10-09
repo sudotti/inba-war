@@ -2,6 +2,7 @@ extends Control
 
 const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
+const SafeArea = preload("res://scripts/safe_area.gd")
 
 const ORDER: Array[String] = [Balance.CHAR_MASSA, Balance.CHAR_TAKETCHI, Balance.CHAR_KENNY]
 const LOCK_ART := "res://assets/ui/lock.png"
@@ -22,66 +23,103 @@ var _closet_name: Label
 var _closet_list: VBoxContainer
 var _closet_who := ""
 var _is_portrait := false
+var _main_margin: MarginContainer
 
 
 func _ready() -> void:
 	_is_portrait = UiFont.portrait(get_viewport_rect().size)
-	UiFont.full_rect(self)
+	get_viewport().size_changed.connect(_on_resized)
+	_build()
+	_build_closet()
+
+
+func _on_resized() -> void:
+	var new_portrait = UiFont.portrait(get_viewport_rect().size)
+	if new_portrait != _is_portrait:
+		_is_portrait = new_portrait
+		_build()
+
+
+func _build() -> void:
+	for child in get_children():
+		if child != _closet:
+			child.queue_free()
+	_main_margin = null
+
 	var night := ColorRect.new()
 	night.color = Color(0.05, 0.04, 0.08, 1.0)
+	night.anchors_preset = Control.PRESET_FULL_RECT
 	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(night)
 	add_child(night)
 
-	var title := UiFont.label("キャラクター選択", 36, UiFont.PAPER)
-	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(title, 0.04, 0.03, 0.96, 0.12)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	add_child(title)
+	_main_margin = MarginContainer.new()
+	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
+	SafeArea.apply_safe_padding(_main_margin, get_viewport())
+	add_child(_main_margin)
 
+	var root := VBoxContainer.new()
+	root.alignment = BoxContainer.ALIGNMENT_CENTER
+	root.add_theme_constant_override("separation", 12)
+	_main_margin.add_child(root)
+
+	# Title
+	var title := UiFont.label("キャラクター選択", 32, UiFont.PAPER)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(title)
+
+	# Character list
 	if _is_portrait:
 		var scroll := ScrollContainer.new()
 		scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-		UiFont.place(scroll, 0.04, 0.14, 0.96, 0.84)
-		add_child(scroll)
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		root.add_child(scroll)
+
 		var content := VBoxContainer.new()
-		content.add_theme_constant_override("separation", 10)
 		content.alignment = BoxContainer.ALIGNMENT_CENTER
+		content.add_theme_constant_override("separation", 12)
 		content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		content.custom_minimum_size = Vector2(0, 1)
 		scroll.add_child(content)
+
 		for who in ORDER:
 			var card = _card(who)
+			card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			content.add_child(card)
+
 		var spacer := Control.new()
 		spacer.custom_minimum_size = Vector2(0, 100)
 		content.add_child(spacer)
 	else:
 		var center := CenterContainer.new()
 		center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		UiFont.place(center, 0.04, 0.14, 0.96, 0.84)
-		add_child(center)
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 18)
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		center.add_child(row)
-		for who in ORDER:
-			row.add_child(_card(who))
+		center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		root.add_child(center)
 
-	var back := UiFont.royal_button("戻る", 24, false)
-	back.custom_minimum_size = Vector2(240, 64)
-	UiFont.place(back, 0.04, 0.86, 0.44 if _is_portrait else 0.28, 0.97)
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 16)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		center.add_child(row)
+
+		for who in ORDER:
+			var card = _card(who)
+			card.custom_minimum_size = Vector2(280, 0)
+			row.add_child(card)
+
+	# Back button
+	var back := UiFont.royal_button("戻る", 22, false)
+	back.custom_minimum_size = Vector2(0, 48)
+	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/title.tscn")
 	)
-	add_child(back)
-	_build_closet()
-
-
-
+	root.add_child(back)
 
 
 func _card(who: String) -> Control:
@@ -89,51 +127,54 @@ func _card(who: String) -> Control:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.custom_minimum_size = Vector2(300, 0)
-	var border := UiFont.BRASS if who == SaveStore.playable_character() else Color("3a3228")
 	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.2, 0.16, 0.12, 0.95), UiFont.glass_border(1.0), 2, 16))
+
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)
 	margin.add_theme_constant_override("margin_right", 16)
-	margin.add_theme_constant_override("margin_top", 12 if not _is_portrait else 8)
-	margin.add_theme_constant_override("margin_bottom", 12 if not _is_portrait else 8)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_bottom", 12)
 	panel.add_child(margin)
+
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 4)
+	col.add_theme_constant_override("separation", 8)
 	margin.add_child(col)
+
 	if _is_portrait:
 		var picture := _portrait_picture(who)
-		picture.custom_minimum_size = Vector2(0, 190)
+		picture.custom_minimum_size = Vector2(0, 200)
 		picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_child(picture)
-		_add_card_text(col, who)
-		_add_card_special(col, who)
-		var actions := HBoxContainer.new()
-		actions.add_theme_constant_override("separation", 8)
-		actions.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		col.add_child(actions)
-		_add_card_actions(actions, who)
-		return panel
-	var picture := TextureRect.new()
-	picture.texture = _portrait(who)
-	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	picture.custom_minimum_size = Vector2(0, 150)
-	picture.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(picture)
-	_pictures[who] = picture
+	else:
+		var picture := TextureRect.new()
+		picture.texture = _portrait(who)
+		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		picture.custom_minimum_size = Vector2(0, 150)
+		picture.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(picture)
+		_pictures[who] = picture
+
 	_add_card_text(col, who)
 	_add_card_special(col, who)
-	_add_card_actions(col, who)
+
+	var actions := VBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	actions.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(actions)
+
+	_add_card_actions(actions, who)
 	return panel
 
 
 func _add_card_special(target: Control, who: String) -> void:
-	var caption := UiFont.label("必殺技", 15 if _is_portrait else 16, UiFont.BRASS)
+	var caption := UiFont.label("必殺技", 16, UiFont.BRASS)
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	target.add_child(caption)
-	var quote := UiFont.label("「%s」" % str(SPECIAL_NAMES[who]), 17 if _is_portrait else 20, UiFont.GOLD)
+	var quote := UiFont.label("「%s」" % str(SPECIAL_NAMES[who]), 18, UiFont.GOLD)
 	quote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	quote.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	quote.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -152,14 +193,14 @@ func _portrait_picture(who: String) -> TextureRect:
 
 
 func _add_card_text(target: Control, who: String) -> void:
-	var name := UiFont.label(who, 30 if not _is_portrait else 26, UiFont.PAPER)
+	var name := UiFont.label(who, 28, UiFont.PAPER)
 	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	target.add_child(name)
 	var stats: Dictionary = Balance.CHARACTERS[who]
-	var numbers := UiFont.label("体力 %d    移動 %d    攻撃 %d" % [int(stats.max_hp), int(stats.speed), int(stats.attack)], 18 if not _is_portrait else 16, UiFont.CREAM)
+	var numbers := UiFont.label("体力 %d    移動 %d    攻撃 %d" % [int(stats.max_hp), int(stats.speed), int(stats.attack)], 16, UiFont.CREAM)
 	numbers.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	target.add_child(numbers)
-	var blurb := UiFont.label(str(BLURB[who]), 16 if not _is_portrait else 15, UiFont.BRASS)
+	var blurb := UiFont.label(str(BLURB[who]), 15, UiFont.BRASS)
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	target.add_child(blurb)
@@ -168,21 +209,25 @@ func _add_card_text(target: Control, who: String) -> void:
 func _add_card_actions(target: Control, who: String) -> void:
 	if SaveStore.is_playable(who):
 		var wear := _costume_button()
+		wear.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		wear.custom_minimum_size = Vector2(0, 48)
 		wear.pressed.connect(func() -> void: _open_closet(who))
 		target.add_child(wear)
-		var go := UiFont.button("出撃する", 24)
+		var go := UiFont.button("出撃する", 22)
 		go.custom_minimum_size = Vector2(0, 56)
+		go.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		go.pressed.connect(func() -> void:
 			SaveStore.set_selected(who)
 			get_tree().change_scene_to_file("res://scenes/battle.tscn")
 		)
 		target.add_child(go)
 	else:
-		var locked := UiFont.label("封印  かけら %d / 5" % SaveStore.fragments_of(who), 20, UiFont.EMBER)
+		var locked := UiFont.label("封印  かけら %d / 5" % SaveStore.fragments_of(who), 18, UiFont.EMBER)
 		locked.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		target.add_child(locked)
-		var go := UiFont.button("かけらを集める", 22)
+		var go := UiFont.button("かけらを集める", 20)
 		go.custom_minimum_size = Vector2(0, 56)
+		go.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		go.pressed.connect(func() -> void:
 			pass
 		)
@@ -192,8 +237,7 @@ func _add_card_actions(target: Control, who: String) -> void:
 func _costume_button() -> Button:
 	var node := Button.new()
 	node.custom_minimum_size = Vector2(48, 48)
-	
-	# Remove all style padding for perfect centering
+
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0, 0, 0, 0)
 	style.border_color = Color(0, 0, 0, 0)
@@ -204,7 +248,7 @@ func _costume_button() -> Button:
 	style.content_margin_bottom = 0
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		node.add_theme_stylebox_override(state, style.duplicate())
-	
+
 	var icon := CostumeIcon.new()
 	icon.custom_minimum_size = Vector2(28, 28)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -229,38 +273,54 @@ func _build_closet() -> void:
 	_closet = Control.new()
 	_closet.visible = false
 	_closet.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(_closet)
+	_closet.anchors_preset = Control.PRESET_FULL_RECT
 	add_child(_closet)
+
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.62)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	UiFont.full_rect(dim)
+	dim.anchors_preset = Control.PRESET_FULL_RECT
 	_closet.add_child(dim)
+
 	var panel := PanelContainer.new()
-	UiFont.place(panel, 0.08 if _is_portrait else 0.32, 0.08 if _is_portrait else 0.16, 0.92 if _is_portrait else 0.68, 0.92 if _is_portrait else 0.84)
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -180
+	panel.offset_top = -200
+	panel.offset_right = 180
+	panel.offset_bottom = 200
 	panel.add_theme_stylebox_override("panel", UiFont.style(UiFont.CARD, UiFont.BRASS, 2, 16))
 	_closet.add_child(panel)
+
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 24)
 	margin.add_theme_constant_override("margin_right", 24)
 	margin.add_theme_constant_override("margin_top", 20)
 	margin.add_theme_constant_override("margin_bottom", 18)
 	panel.add_child(margin)
+
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 10)
+	col.add_theme_constant_override("separation", 12)
 	margin.add_child(col)
-	var heading := UiFont.label("衣装選択", 32, UiFont.PAPER)
+
+	var heading := UiFont.label("衣装選択", 30, UiFont.PAPER)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(heading)
-	_closet_name = UiFont.label("", 22, UiFont.BRASS)
+
+	_closet_name = UiFont.label("", 20, UiFont.BRASS)
 	_closet_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_closet_name)
+
 	_closet_list = VBoxContainer.new()
 	_closet_list.add_theme_constant_override("separation", 8)
 	_closet_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(_closet_list)
-	var close := UiFont.button("戻る", 24)
-	close.custom_minimum_size = Vector2(0, 60)
+
+	var close := UiFont.button("戻る", 22)
+	close.custom_minimum_size = Vector2(0, 56)
+	close.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	close.pressed.connect(_close_closet)
 	col.add_child(close)
 
@@ -280,8 +340,9 @@ func _open_closet(who: String) -> void:
 			caption += "    着用中"
 		elif not owned:
 			caption += "    未入手"
-		var choice := UiFont.button(caption, 22)
-		choice.custom_minimum_size = Vector2(0, 60)
+		var choice := UiFont.button(caption, 20)
+		choice.custom_minimum_size = Vector2(0, 56)
+		choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		choice.disabled = not owned
 		if wearing == look_id:
 			choice.add_theme_stylebox_override("normal", UiFont.style(UiFont.BRASS, UiFont.INK, 2, 12))
@@ -322,7 +383,7 @@ class CostumeIcon extends Control:
 			Vector2(cx + 4.0 * u, cy + 9.0 * u),
 			Vector2(cx + 4.0 * u, cy - 3.0 * u),
 			Vector2(cx + 6.0 * u, cy - 1.0 * u),
-			Vector2(cx + 10.0 * u, cy - 5.0 * u),
+			Vector2(cx + 10.0 * u, cy - 5.0 *u),
 			Vector2(cx + 7.0 * u, cy - 9.0 * u),
 			Vector2(cx + 3.0 * u, cy - 11.0 * u),
 			Vector2(cx, cy - 8.0 * u),
