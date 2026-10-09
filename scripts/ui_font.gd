@@ -118,6 +118,10 @@ static func royal_panel(fill: Color = ROYAL, border: Color = BRASS, width: int =
 	return style(fill, border, width, radius)
 
 
+static func portrait(size: Vector2) -> bool:
+	return size.y > size.x
+
+
 static func full_rect(node: Control) -> void:
 	node.set_anchors_preset(Control.PRESET_FULL_RECT)
 	node.offset_left = 0

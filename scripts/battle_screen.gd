@@ -47,7 +47,7 @@ var _gain: Label
 var _gain_left := 0.0
 
 var build_root: Control
-var card_row: HBoxContainer
+var card_row: BoxContainer
 var timer_label: Label
 var timer_fill: ColorRect
 var build_left := Balance.BUILD_SELECT_SECONDS
@@ -97,12 +97,14 @@ var _boss_banner_action: Label
 var _boss_banner_tween: Tween
 var _seen_boss_alert := 0
 var _compact_layout := false
+var _stacked_cards := false
 
 
 func _ready() -> void:
 	_who = SaveStore.playable_character()
 	var viewport_size := get_viewport_rect().size
 	_compact_layout = viewport_size.x < 1080.0 or viewport_size.y < 600.0
+	_stacked_cards = viewport_size.x < 560.0
 	sim = BattleSim.new(_who)
 	camera = Camera2D.new()
 	camera.position_smoothing_enabled = false
@@ -1393,10 +1395,14 @@ func _build_choice() -> void:
 	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(note)
 
-	card_row = HBoxContainer.new()
+	if _stacked_cards:
+		card_row = VBoxContainer.new()
+		card_row.add_theme_constant_override("separation", 8)
+	else:
+		card_row = HBoxContainer.new()
+		card_row.add_theme_constant_override("separation", 8 if _compact_layout else 22)
 	card_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	card_row.add_theme_constant_override("separation", 8 if _compact_layout else 22)
 	card_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(card_row)
 
@@ -1452,7 +1458,10 @@ func _card(index: int, id: String) -> Control:
 	var viewport_size := get_viewport_rect().size
 	var card_width := 360.0
 	var card_height := 280.0
-	if _compact_layout:
+	if _stacked_cards:
+		card_width = viewport_size.x * 0.80
+		card_height = 150.0
+	elif _compact_layout:
 		card_width = maxf(150.0, minf(240.0, (viewport_size.x * 0.82 - 16.0) / 3.0))
 		card_height = clampf(viewport_size.y * 0.52, 200.0, 260.0)
 	button.custom_minimum_size = Vector2(card_width, card_height)
@@ -1470,41 +1479,59 @@ func _card(index: int, id: String) -> Control:
 	band.offset_left = 8.0
 	band.offset_top = 8.0
 	band.offset_right = -8.0
-	band.offset_bottom = 52.0
+	band.offset_bottom = 36.0 if _stacked_cards else 52.0
 	button.add_child(band)
 	var key := UiFont.label("%d" % (index + 1), 26, UiFont.PAPER)
 	key.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	key.position = Vector2(22, 14)
+	key.position = Vector2(22, 12 if _stacked_cards else 14)
 	button.add_child(key)
 
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
 	box.offset_left = 18
-	box.offset_top = 64
+	box.offset_top = 44 if _stacked_cards else 64
 	box.offset_right = -18
-	box.offset_bottom = -16
+	box.offset_bottom = -10 if _stacked_cards else -16
 	box.add_theme_constant_override("separation", 10)
 	button.add_child(box)
 
-	var name := UiFont.label(Balance.UPGRADE_NAME[id], 23 if _compact_layout else 28, UiFont.INK)
+	var name := UiFont.label(Balance.UPGRADE_NAME[id], 20 if _stacked_cards else (23 if _compact_layout else 28), UiFont.INK)
 	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name.add_theme_constant_override("outline_size", 0)
-	box.add_child(name)
-	var level := UiFont.label("レベル %d  →  %d" % [current, nxt], 19 if _compact_layout else 24, UiFont.PINK)
+	var level := UiFont.label("レベル %d  →  %d" % [current, nxt], 16 if _stacked_cards else (19 if _compact_layout else 24), UiFont.PINK)
 	level.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	level.add_theme_constant_override("outline_size", 0)
-	box.add_child(level)
-	var body := UiFont.label(Balance.upgrade_blurb(id, nxt), 17 if _compact_layout else 22, UiFont.INK)
+	var body := UiFont.label(Balance.upgrade_blurb(id, nxt), 16 if _stacked_cards else (17 if _compact_layout else 22), UiFont.INK)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_theme_constant_override("outline_size", 0)
+	var mark := UiFont.label("自動選択", 14 if _stacked_cards else 18, UiFont.NAVY)
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mark.add_theme_constant_override("outline_size", 0)
+	if _stacked_cards:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(row)
+		var side := VBoxContainer.new()
+		side.add_theme_constant_override("separation", 2)
+		side.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		side.custom_minimum_size = Vector2(card_width * 0.40, 0)
+		row.add_child(side)
+		side.add_child(name)
+		side.add_child(level)
+		if index == 0:
+			side.add_child(mark)
+		body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(body)
+		return button
+	box.add_child(name)
+	box.add_child(level)
 	box.add_child(body)
 	if index == 0:
-		var mark := UiFont.label("自動選択", 18, UiFont.NAVY)
-		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		mark.add_theme_constant_override("outline_size", 0)
 		box.add_child(mark)
 	return button
 

@@ -3,9 +3,21 @@ extends Control
 const UiFont = preload("res://scripts/ui_font.gd")
 
 var _rows: VBoxContainer
+var _col_rank := 90.0
+var _col_name := 250.0
+var _col_char := 220.0
+var _col_score := 200.0
+var _col_date := 220.0
 
 
 func _ready() -> void:
+	var view := get_viewport_rect().size
+	var total := view.x * 0.88
+	_col_rank = total * 0.08
+	_col_name = total * 0.30
+	_col_char = total * 0.20
+	_col_score = total * 0.18
+	_col_date = total * 0.24
 	UiFont.full_rect(self)
 	var background := ColorRect.new()
 	background.color = UiFont.NIGHT
@@ -32,11 +44,11 @@ func _ready() -> void:
 	var heading := HBoxContainer.new()
 	heading.add_theme_constant_override("separation", 16)
 	content.add_child(heading)
-	_add_heading(heading, "順位", 90)
-	_add_heading(heading, "名前", 250)
-	_add_heading(heading, "キャラ", 220)
-	_add_heading(heading, "スコア", 200)
-	_add_heading(heading, "記録日", 220)
+	_add_heading(heading, "順位", _col_rank)
+	_add_heading(heading, "名前", _col_name)
+	_add_heading(heading, "キャラ", _col_char)
+	_add_heading(heading, "スコア", _col_score)
+	_add_heading(heading, "記録日", _col_date)
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override("separation", 3)
 	_rows.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -61,11 +73,11 @@ func _refresh() -> void:
 		row.add_theme_constant_override("separation", 16)
 		row.custom_minimum_size.y = 54
 		var color := UiFont.YELLOW if index == 0 else UiFont.PAPER
-		_add_cell(row, "%02d" % (index + 1), 90, color)
-		_add_cell(row, str(entry.get("name", "ななし")), 250, color)
-		_add_cell(row, str(entry.get("character", "")), 220, UiFont.CREAM)
-		_add_cell(row, "%d" % int(entry.get("score", 0)), 200, color)
-		_add_cell(row, _short_date(str(entry.get("date", ""))), 220, UiFont.CREAM)
+		_add_cell(row, "%02d" % (index + 1), _col_rank, color)
+		_add_cell(row, str(entry.get("name", "ななし")), _col_name, color)
+		_add_cell(row, str(entry.get("character", "")), _col_char, UiFont.CREAM)
+		_add_cell(row, "%d" % int(entry.get("score", 0)), _col_score, color)
+		_add_cell(row, _short_date(str(entry.get("date", ""))), _col_date, UiFont.CREAM)
 		_rows.add_child(row)
 		var rule := ColorRect.new()
 		rule.color = Color(1.0, 0.88, 0.66, 0.16)

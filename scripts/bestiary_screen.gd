@@ -36,12 +36,21 @@ func _ready() -> void:
 	back.pressed.connect(_back)
 	header.add_child(back)
 
-	var body := HBoxContainer.new()
-	body.add_theme_constant_override("separation", 18)
+	var portrait := UiFont.portrait(get_viewport_rect().size)
+	var body := BoxContainer.new()
+	if portrait:
+		body = VBoxContainer.new()
+		body.add_theme_constant_override("separation", 12)
+	else:
+		body = HBoxContainer.new()
+		body.add_theme_constant_override("separation", 18)
 	UiFont.place(body, 0.04, 0.16, 0.96, 0.94)
 	add_child(body)
 	var list := PanelContainer.new()
-	list.custom_minimum_size = Vector2(290, 0)
+	if portrait:
+		list.custom_minimum_size = Vector2(0, 250)
+	else:
+		list.custom_minimum_size = Vector2(290, 0)
 	list.add_theme_stylebox_override("panel", UiFont.style(UiFont.CARD, UiFont.BRASS_DEEP, 2, 4))
 	body.add_child(list)
 	var list_margin := MarginContainer.new()
@@ -62,16 +71,24 @@ func _ready() -> void:
 	_entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_entries)
 
-	var detail := HBoxContainer.new()
-	detail.add_theme_constant_override("separation", 26)
+	var detail := BoxContainer.new()
+	if portrait:
+		detail = VBoxContainer.new()
+		detail.alignment = BoxContainer.ALIGNMENT_CENTER
+		detail.add_theme_constant_override("separation", 10)
+	else:
+		detail = HBoxContainer.new()
+		detail.add_theme_constant_override("separation", 26)
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if not portrait:
+		detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(detail)
 	var portrait_panel := PanelContainer.new()
-	portrait_panel.custom_minimum_size = Vector2(360, 0)
+	portrait_panel.custom_minimum_size = Vector2(360 if not portrait else 0, 0 if not portrait else 300)
 	portrait_panel.add_theme_stylebox_override("panel", UiFont.style(Color("201b18"), UiFont.BRASS_DEEP, 2, 4))
 	detail.add_child(portrait_panel)
 	_portrait = TextureRect.new()
-	_portrait.custom_minimum_size = Vector2(340, 360)
+	_portrait.custom_minimum_size = Vector2(340, 360 if not portrait else 280)
 	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR

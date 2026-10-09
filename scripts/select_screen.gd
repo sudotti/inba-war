@@ -16,9 +16,11 @@ var _closet: Control
 var _closet_name: Label
 var _closet_list: VBoxContainer
 var _closet_who := ""
+var _is_portrait := false
 
 
 func _ready() -> void:
+	_is_portrait = UiFont.portrait(get_viewport_rect().size)
 	UiFont.full_rect(self)
 	var night := ColorRect.new()
 	night.color = UiFont.NIGHT
@@ -40,8 +42,16 @@ func _ready() -> void:
 	row.add_theme_constant_override("separation", 18)
 	UiFont.place(row, 0.04, 0.14, 0.96, 0.84)
 	add_child(row)
-	for who in ORDER:
-		row.add_child(_card(who))
+	if _is_portrait:
+		var list := VBoxContainer.new()
+		list.add_theme_constant_override("separation", 10)
+		UiFont.full_rect(list)
+		row.add_child(list)
+		for who in ORDER:
+			list.add_child(_card(who))
+	else:
+		for who in ORDER:
+			row.add_child(_card(who))
 
 	var back := UiFont.button("戻る", 24)
 	back.custom_minimum_size = Vector2(240, 64)
@@ -72,13 +82,27 @@ func _card(who: String) -> Control:
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)
 	margin.add_theme_constant_override("margin_right", 16)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.add_theme_constant_override("margin_top", 12 if not _is_portrait else 8)
+	margin.add_theme_constant_override("margin_bottom", 12 if not _is_portrait else 8)
 	panel.add_child(margin)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 4)
 	margin.add_child(col)
-
+	if _is_portrait:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 14)
+		col.add_child(row)
+		row.add_child(_portrait_picture(who))
+		var side := VBoxContainer.new()
+		side.add_theme_constant_override("separation", 4)
+		side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(side)
+		_add_card_text(side, who)
+		var actions := HBoxContainer.new()
+		actions.add_theme_constant_override("separation", 8)
+		col.add_child(actions)
+		_add_card_actions(actions, who)
+		return panel
 	var picture := TextureRect.new()
 	picture.texture = _portrait(who)
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -88,39 +112,56 @@ func _card(who: String) -> Control:
 	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(picture)
 	_pictures[who] = picture
+	_add_card_text(col, who)
+	_add_card_actions(col, who)
+	return panel
 
-	var name := UiFont.label(who, 30, UiFont.PAPER)
-	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(name)
+
+func _portrait_picture(who: String) -> TextureRect:
+	var picture := TextureRect.new()
+	picture.texture = _portrait(who)
+	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	picture.custom_minimum_size = Vector2(140, 140)
+	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pictures[who] = picture
+	return picture
+
+
+func _add_card_text(target: Control, who: String) -> void:
+	var name := UiFont.label(who, 30 if not _is_portrait else 24, UiFont.PAPER)
+	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if not _is_portrait else HORIZONTAL_ALIGNMENT_LEFT
+	target.add_child(name)
 	var stats: Dictionary = Balance.CHARACTERS[who]
-	var numbers := UiFont.label("体力 %d    移動 %d    攻撃 %d" % [int(stats.max_hp), int(stats.speed), int(stats.attack)], 18, UiFont.CREAM)
-	numbers.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(numbers)
-	var blurb := UiFont.label(str(BLURB[who]), 16, UiFont.BRASS)
-	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(blurb)
+	var numbers := UiFont.label("体力 %d    移動 %d    攻撃 %d" % [int(stats.max_hp), int(stats.speed), int(stats.attack)], 18 if not _is_portrait else 16, UiFont.CREAM)
+	numbers.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if not _is_portrait else HORIZONTAL_ALIGNMENT_LEFT
+	target.add_child(numbers)
+	var blurb := UiFont.label(str(BLURB[who]), 16 if not _is_portrait else 14, UiFont.BRASS)
+	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if not _is_portrait else HORIZONTAL_ALIGNMENT_LEFT
+	target.add_child(blurb)
 
-	if playable:
+
+func _add_card_actions(target: Control, who: String) -> void:
+	if SaveStore.is_playable(who):
 		var wear := UiFont.button("衣装", 20)
 		wear.custom_minimum_size = Vector2(0, 48)
 		wear.pressed.connect(func() -> void: _open_closet(who))
-		col.add_child(wear)
+		target.add_child(wear)
 		var go := UiFont.button("出撃する", 24)
 		go.custom_minimum_size = Vector2(0, 56)
 		go.pressed.connect(func() -> void:
 			SaveStore.set_selected(who)
 			get_tree().change_scene_to_file("res://scenes/battle.tscn")
 		)
-		col.add_child(go)
+		target.add_child(go)
 	else:
 		var locked := UiFont.label("封印  かけら %d / 5" % SaveStore.fragments_of(who), 20, UiFont.EMBER)
-		locked.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		col.add_child(locked)
+		locked.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if not _is_portrait else HORIZONTAL_ALIGNMENT_LEFT
+		target.add_child(locked)
 		var go := UiFont.button("かけらを集める", 22)
 		go.custom_minimum_size = Vector2(0, 56)
 		go.pressed.connect(_open_shop)
-		col.add_child(go)
-	return panel
+		target.add_child(go)
 
 
 func _portrait(who: String) -> Texture2D:
