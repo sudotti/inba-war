@@ -5,6 +5,11 @@ const UiFont = preload("res://scripts/ui_font.gd")
 
 const ORDER: Array[String] = [Balance.CHAR_MASSA, Balance.CHAR_TAKETCHI, Balance.CHAR_KENNY]
 const LOCK_ART := "res://assets/ui/lock.png"
+const SPECIAL_NAMES := {
+	Balance.CHAR_MASSA: "たけだの鉄パイプ",
+	Balance.CHAR_TAKETCHI: "エニタイム",
+	Balance.CHAR_KENNY: "理学療法連脚",
+}
 const BLURB := {
 	Balance.CHAR_MASSA: "広い射程と強い吹き飛ばし",
 	Balance.CHAR_TAKETCHI: "近距離を高威力で制圧",
@@ -126,7 +131,7 @@ func _add_card_special(target: Control, who: String) -> void:
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	target.add_child(caption)
-	var quote := UiFont.label("「%s」" % str(Balance.SPECIAL_QUOTES[who]), 17 if _is_portrait else 20, UiFont.GOLD)
+	var quote := UiFont.label("「%s」" % str(SPECIAL_NAMES[who]), 17 if _is_portrait else 20, UiFont.GOLD)
 	quote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	quote.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	quote.mouse_filter = Control.MOUSE_FILTER_IGNORE
