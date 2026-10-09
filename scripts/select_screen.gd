@@ -190,8 +190,21 @@ func _add_card_actions(target: Control, who: String) -> void:
 
 
 func _costume_button() -> Button:
-	var node := UiFont.button("", 20)
+	var node := Button.new()
 	node.custom_minimum_size = Vector2(48, 48)
+	
+	# Remove all style padding for perfect centering
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0)
+	style.border_color = Color(0, 0, 0, 0)
+	style.set_border_width_all(0)
+	style.content_margin_left = 0
+	style.content_margin_right = 0
+	style.content_margin_top = 0
+	style.content_margin_bottom = 0
+	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+		node.add_theme_stylebox_override(state, style.duplicate())
+	
 	var icon := CostumeIcon.new()
 	icon.custom_minimum_size = Vector2(28, 28)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
