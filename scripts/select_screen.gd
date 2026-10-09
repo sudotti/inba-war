@@ -51,8 +51,16 @@ func _rebuild() -> void:
 
 func _portrait_now() -> bool:
 	# Use window size instead of viewport rect (stretch mode affects viewport)
-	if DisplayServer.has_feature("window_get_size"):
-		var win_size := DisplayServer.window_get_size()
+	var win_size := Vector2.ZERO
+	var success := false
+	# Try to get window size, fall back if not available
+	var methods := DisplayServer.get_method_list()
+	for m in methods:
+		if m.name == "window_get_size":
+			win_size = DisplayServer.window_get_size()
+			success = true
+			break
+	if success and win_size != Vector2.ZERO:
 		return win_size.y > win_size.x
 	return UiFont.portrait(get_viewport().get_visible_rect().size)
 
