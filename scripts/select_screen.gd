@@ -25,12 +25,12 @@ var _closet_who := ""
 var _is_portrait := false
 var _main_margin: MarginContainer
 var _main_container: Control
-var _timer := 0.0
 var _rebuild_pending := false
 
 
 func _ready() -> void:
-	_is_portrait = _portrait_now()
+	# Initial orientation from viewport (fixed by stretch mode)
+	_is_portrait = UiFont.portrait(get_viewport().get_visible_rect().size)
 
 	# Persistent background
 	var night := ColorRect.new()
@@ -53,18 +53,20 @@ func _ready() -> void:
 	_main_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_main_margin.add_child(_main_container)
 
+	# Connect to viewport size changed for actual orientation changes
+	get_viewport().size_changed.connect(_on_viewport_resized)
+
 	_fill()
 	_build_closet()
 
 
-func _process(delta: float) -> void:
-	_timer -= delta
-	if _timer > 0.0:
+func _on_viewport_resized() -> void:
+	if _rebuild_pending:
 		return
-	var p := _portrait_now()
-	if p != _is_portrait and not _rebuild_pending:
-		_is_portrait = p
-		_timer = 0.5
+	# Viewport size changed (happens when stretch mode allows it)
+	var new_portrait := UiFont.portrait(get_viewport().get_visible_rect().size)
+	if new_portrait != _is_portrait:
+		_is_portrait = new_portrait
 		_rebuild_pending = true
 		call_deferred("_do_refill")
 
@@ -78,20 +80,6 @@ func _do_refill() -> void:
 	SafeArea.apply_safe_padding(_main_margin, get_viewport())
 	_fill()
 	_rebuild_pending = false
-
-
-func _portrait_now() -> bool:
-	var win_size := Vector2.ZERO
-	var success := false
-	var methods := DisplayServer.get_method_list()
-	for m in methods:
-		if m.name == "window_get_size":
-			win_size = DisplayServer.window_get_size()
-			success = true
-			break
-	if success and win_size != Vector2.ZERO:
-		return win_size.y > win_size.x
-	return UiFont.portrait(get_viewport().get_visible_rect().size)
 
 
 func _fill() -> void:
@@ -117,7 +105,7 @@ func _fill() -> void:
 		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		content.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		scroll.add_child(content)
-		content.custom_minimum_size.x = 360
+		# No custom_minimum_size.x - let size_flags_horizontal=EXPAND_FILL handle width
 
 		for who in ORDER:
 			var card = _card(who)
@@ -127,11 +115,6 @@ func _fill() -> void:
 		var spacer := Control.new()
 		spacer.custom_minimum_size = Vector2(0, 24)
 		content.add_child(spacer)
-		
-		# Ensure content width matches scroll width
-		scroll.resized.connect(func() -> void:
-			content.custom_minimum_size.x = scroll.size.x
-		)
 	else:
 		var center := CenterContainer.new()
 		center.mouse_filter = Control.MOUSE_FILTER_IGNORE
