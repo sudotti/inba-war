@@ -6,9 +6,9 @@ const UiFont = preload("res://scripts/ui_font.gd")
 const ORDER: Array[String] = [Balance.CHAR_KENNY, Balance.CHAR_TAKETCHI, Balance.CHAR_MASSA]
 const LOCK_ART := "res://assets/ui/lock.png"
 const BLURB := {
-	Balance.CHAR_MASSA: "鉄パイプ。振りが広い",
-	Balance.CHAR_TAKETCHI: "拳。近いところを重く",
-	Balance.CHAR_KENNY: "キック。足が速い",
+	Balance.CHAR_MASSA: "広い射程と強い吹き飛ばし",
+	Balance.CHAR_TAKETCHI: "近距離を高威力で制圧",
+	Balance.CHAR_KENNY: "高速移動 / 被ダメージ軽減",
 }
 
 var _pictures: Dictionary = {}
@@ -26,11 +26,11 @@ func _ready() -> void:
 	UiFont.full_rect(night)
 	add_child(night)
 
-	var title := UiFont.label("出撃", 40, UiFont.PAPER)
+	var title := UiFont.label("キャラクター選択", 36, UiFont.PAPER)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.place(title, 0.04, 0.03, 0.40, 0.12)
 	add_child(title)
-	var yen := UiFont.label("100イェン  %d枚" % int(SaveStore.data.yen), 26, UiFont.BRASS)
+	var yen := UiFont.label("所持  %d イェン" % int(SaveStore.data.yen), 24, UiFont.BRASS)
 	yen.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	yen.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.place(yen, 0.50, 0.03, 0.96, 0.12)
@@ -43,14 +43,14 @@ func _ready() -> void:
 	for who in ORDER:
 		row.add_child(_card(who))
 
-	var back := UiFont.button("タイトルへ", 24)
+	var back := UiFont.button("戻る", 24)
 	back.custom_minimum_size = Vector2(240, 64)
 	UiFont.place(back, 0.04, 0.86, 0.28, 0.97)
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/title.tscn")
 	)
 	add_child(back)
-	var shop := UiFont.button("なかむらショップ", 24)
+	var shop := UiFont.button("商店", 24)
 	shop.custom_minimum_size = Vector2(280, 64)
 	UiFont.place(shop, 0.68, 0.86, 0.96, 0.97)
 	shop.pressed.connect(_open_shop)
@@ -93,7 +93,7 @@ func _card(who: String) -> Control:
 	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(name)
 	var stats: Dictionary = Balance.CHARACTERS[who]
-	var numbers := UiFont.label("HP %d    速さ %d    攻撃 %d" % [int(stats.max_hp), int(stats.speed), int(stats.attack)], 16, UiFont.CREAM)
+	var numbers := UiFont.label("体力 %d    移動 %d    攻撃 %d" % [int(stats.max_hp), int(stats.speed), int(stats.attack)], 18, UiFont.CREAM)
 	numbers.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(numbers)
 	var blurb := UiFont.label(str(BLURB[who]), 16, UiFont.BRASS)
@@ -101,11 +101,11 @@ func _card(who: String) -> Control:
 	col.add_child(blurb)
 
 	if playable:
-		var wear := UiFont.button("クローゼット", 20)
+		var wear := UiFont.button("衣装", 20)
 		wear.custom_minimum_size = Vector2(0, 48)
 		wear.pressed.connect(func() -> void: _open_closet(who))
 		col.add_child(wear)
-		var go := UiFont.button("出る", 24)
+		var go := UiFont.button("出撃する", 24)
 		go.custom_minimum_size = Vector2(0, 56)
 		go.pressed.connect(func() -> void:
 			SaveStore.set_selected(who)
@@ -113,10 +113,10 @@ func _card(who: String) -> Control:
 		)
 		col.add_child(go)
 	else:
-		var locked := UiFont.label("かけら  %d/5" % SaveStore.fragments_of(who), 20, UiFont.EMBER)
+		var locked := UiFont.label("封印  かけら %d / 5" % SaveStore.fragments_of(who), 20, UiFont.EMBER)
 		locked.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		col.add_child(locked)
-		var go := UiFont.button("ショップへ", 22)
+		var go := UiFont.button("かけらを集める", 22)
 		go.custom_minimum_size = Vector2(0, 56)
 		go.pressed.connect(_open_shop)
 		col.add_child(go)
@@ -158,7 +158,7 @@ func _build_closet() -> void:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
 	margin.add_child(col)
-	var heading := UiFont.label("クローゼット", 32, UiFont.PAPER)
+	var heading := UiFont.label("衣装選択", 32, UiFont.PAPER)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(heading)
 	_closet_name = UiFont.label("", 22, UiFont.BRASS)
@@ -168,7 +168,7 @@ func _build_closet() -> void:
 	_closet_list.add_theme_constant_override("separation", 8)
 	_closet_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(_closet_list)
-	var close := UiFont.button("閉じる", 24)
+	var close := UiFont.button("戻る", 24)
 	close.custom_minimum_size = Vector2(0, 60)
 	close.pressed.connect(_close_closet)
 	col.add_child(close)
@@ -186,9 +186,9 @@ func _open_closet(who: String) -> void:
 		var owned := SaveStore.owns_look(look_id)
 		var caption := str(entry["label"])
 		if wearing == look_id:
-			caption += "    着てる"
+			caption += "    着用中"
 		elif not owned:
-			caption += "    未所持"
+			caption += "    未入手"
 		var choice := UiFont.button(caption, 22)
 		choice.custom_minimum_size = Vector2(0, 60)
 		choice.disabled = not owned

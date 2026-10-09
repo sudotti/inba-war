@@ -23,6 +23,8 @@ const ART_NORMAL := "res://assets/battle/enemy_normal.png"
 const ART_FAST := "res://assets/battle/enemy_fast.png"
 const ART_TANK := "res://assets/battle/enemy_tank.png"
 const ART_CONE := "res://assets/battle/cone.png"
+const ART_NIMOTON := "res://assets/battle/boss_nimoton.png"
+const ART_KASSEN := "res://assets/battle/boss_kassen.png"
 
 var sim
 var camera: Camera2D
@@ -31,6 +33,8 @@ var art_normal: Texture2D
 var art_fast: Texture2D
 var art_tank: Texture2D
 var art_cone: Texture2D
+var art_nimoton: Texture2D
+var art_kassen: Texture2D
 
 var time_label: Label
 var hp_label: Label
@@ -77,9 +81,21 @@ var _special_face: TextureRect
 var _special_name: Label
 var _special_quote: Label
 var _special_ring_left := 0.0
+var _special_phase := ""
+var _special_motion_left := 0.0
+var _special_motion_duration := 0.0
 var _special_tween: Tween
 var _special_flash: ColorRect
 var _special_flash_tween: Tween
+var _boss_panel: PanelContainer
+var _boss_name: Label
+var _boss_hp: ProgressBar
+var _boss_banner: PanelContainer
+var _boss_banner_image: TextureRect
+var _boss_banner_name: Label
+var _boss_banner_action: Label
+var _boss_banner_tween: Tween
+var _seen_boss_alert := 0
 
 
 func _ready() -> void:
@@ -94,7 +110,10 @@ func _ready() -> void:
 	art_fast = load(ART_FAST)
 	art_tank = load(ART_TANK)
 	art_cone = load(ART_CONE)
+	art_nimoton = load(ART_NIMOTON)
+	art_kassen = load(ART_KASSEN)
 	_build_hud()
+	_build_boss_hud()
 	_build_stick()
 	_build_choice()
 	_follow_camera()
@@ -102,6 +121,11 @@ func _ready() -> void:
 
 func _process(dt: float) -> void:
 	_special_ring_left = maxf(0.0, _special_ring_left - dt)
+	if _special_phase == "motion":
+		_special_motion_left = maxf(0.0, _special_motion_left - dt)
+		if _special_motion_left <= 0.0:
+			_special_phase = ""
+			sim.finish_special_motion()
 	if sim.finished:
 		_go_result()
 		return
@@ -276,9 +300,51 @@ func _burst(spot: Vector2, kind: String) -> void:
 		})
 
 
+func _draw_boss_telegraphs() -> void:
+	for pool in sim.poison_pools:
+		var fade := clampf(float(pool.life) / 0.8, 0.0, 1.0)
+		var pulse := 0.8 + 0.2 * sin(_anim * 8.0)
+		draw_circle(pool.pos, float(pool.radius), Color(0.37, 0.9, 0.12, 0.18 * fade))
+		draw_arc(pool.pos, float(pool.radius) * pulse, 0.0, TAU, 48, Color(0.68, 1.0, 0.22, 0.72 * fade), 6.0, true)
+	for projectile in sim.boss_projectiles:
+		if projectile.kind == Balance.BOSS_VOLLEY:
+			var flight := maxf(float(projectile.flight_seconds), 0.01)
+			var progress := clampf(float(projectile.age) / flight, 0.0, 1.0)
+			var height := sin(progress * PI) * 112.0
+			var spot: Vector2 = projectile.pos + Vector2(0.0, -height)
+			draw_set_transform(projectile.pos + Vector2(0.0, 8.0), 0.0, Vector2(1.0, 0.32))
+			draw_circle(Vector2.ZERO, float(projectile.radius) * 1.25, Color(0.0, 0.0, 0.0, 0.3))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			draw_circle(spot, float(projectile.radius), Color("f7f2dc"))
+			draw_arc(spot, float(projectile.radius) * 0.72, _anim * 3.0, _anim * 3.0 + PI * 0.82, 24, Color("2389b8"), 5.0, true)
+			draw_arc(spot, float(projectile.radius) * 0.48, _anim * 3.0 + PI, _anim * 3.0 + PI * 1.82, 24, Color("d64e45"), 4.0, true)
+		else:
+			var spot: Vector2 = projectile.pos + Vector2(0.0, sin(_anim * 15.0) * 5.0)
+			draw_circle(spot, float(projectile.radius) * 1.6, Color(0.45, 1.0, 0.12, 0.22))
+			draw_circle(spot, float(projectile.radius), Color("98ed38"))
+			draw_circle(spot + Vector2(-5.0, -5.0), 5.0, Color("eaffab"))
+	for actor in sim.enemies:
+		if actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "poison_windup":
+			var target: Vector2 = actor.target_pos
+			var pulse := 0.7 + 0.3 * sin(_anim * 18.0)
+			draw_circle(target, 52.0 + pulse * 12.0, Color(0.4, 1.0, 0.08, 0.12))
+			draw_arc(target, 68.0 + pulse * 14.0, 0.0, TAU, 48, Color(0.69, 1.0, 0.2, 0.88), 5.0, true)
+			draw_line(actor.pos, target, Color(0.62, 1.0, 0.18, 0.38), 3.0, true)
+		elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "volley_windup":
+			var target: Vector2 = actor.target_pos
+			draw_arc(target, 34.0 + sin(_anim * 16.0) * 8.0, 0.0, TAU, 40, Color(1.0, 0.78, 0.25, 0.9), 5.0, true)
+			draw_line(actor.pos, target, Color(1.0, 0.9, 0.55, 0.68), 4.0, true)
+		elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_windup":
+			var direction: Vector2 = (actor.target_pos - actor.pos).normalized()
+			var side := direction.orthogonal() * 24.0
+			for offset in [-1.0, 0.0, 1.0]:
+				draw_line(actor.pos + side * offset, actor.target_pos + side * offset, Color(1.0, 0.4, 0.23, 0.72 - absf(offset) * 0.15), 8.0 - absf(offset) * 2.0, true)
+
+
 func _draw() -> void:
 	_draw_ground()
 	_draw_special_aura()
+	_draw_boss_telegraphs()
 	if _special_ring_left > 0.0:
 		var progress := 1.0 - _special_ring_left / Balance.SPECIAL_MASSA_MOTION_SECONDS
 		var start := -PI * 0.5 + progress * TAU
@@ -351,7 +417,19 @@ func _draw() -> void:
 				tex = art_tank
 				max_h = 132.0
 				max_w = 176.0
+			elif actor.kind == Balance.KIND_NIMOTON:
+				tex = art_nimoton
+				max_h = 320.0
+				max_w = 420.0
+			elif actor.kind == Balance.KIND_KASSEN:
+				tex = art_tank
+				max_h = 232.0
+				max_w = 250.0
 			var head := _draw_posed(tex, foot, max_h, max_w, pose)
+			if Balance.BOSS_KINDS.has(actor.kind):
+				var boss_color := Color("baf05c") if actor.kind == Balance.KIND_NIMOTON else Color("ffd05d")
+				draw_string_outline(UiFont.font(), Vector2(foot.x - 110.0, head - 12.0), str(Balance.BOSS_NAME[actor.kind]), HORIZONTAL_ALIGNMENT_CENTER, 220.0, 24, 5, Color(0, 0, 0, 0.95))
+				draw_string(UiFont.font(), Vector2(foot.x - 110.0, head - 12.0), str(Balance.BOSS_NAME[actor.kind]), HORIZONTAL_ALIGNMENT_CENTER, 220.0, 24, boss_color)
 			if actor.hp < actor.max_hp:
 				_draw_hp_bar(foot, head, float(actor.hp) / float(maxi(actor.max_hp, 1)))
 			if actor.stun > 0.0:
@@ -406,9 +484,8 @@ func _player_visual() -> Dictionary:
 		hop = lift * float(body.bob)
 		var side := 1.0 if idx % 2 == 0 else -1.0
 		sway = lift * float(body.sway) * side
-	if sim.special_motion_left > 0.0:
-		var motion_duration := Balance.special_motion_seconds(_who)
-		var progress := 1.0 - sim.special_motion_left / motion_duration
+	if _special_phase == "motion" and _special_motion_left > 0.0:
+		var progress := 1.0 - _special_motion_left / _special_motion_duration
 		var aim := _aim.normalized() if _aim.length() > 0.01 else Vector2.RIGHT
 		frame = "hit"
 		hop = 0.0
@@ -440,8 +517,8 @@ func _player_visual() -> Dictionary:
 
 
 func _draw_special_aura() -> void:
-	if sim.special_motion_left > 0.0:
-		var progress := 1.0 - sim.special_motion_left / Balance.special_motion_seconds(_who)
+	if _special_phase == "motion" and _special_motion_left > 0.0:
+		var progress := 1.0 - _special_motion_left / _special_motion_duration
 		var aim := _aim.normalized() if _aim.length() > 0.01 else Vector2.RIGHT
 		if _who == Balance.CHAR_MASSA:
 			for i in 3:
@@ -504,6 +581,26 @@ func _enemy_pose(actor) -> Dictionary:
 		amp = 5.0
 		squash = 0.06
 		lean = 0.03
+	elif actor.kind == Balance.KIND_NIMOTON:
+		rate = 5.2
+		amp = 13.0
+		squash = 0.12
+		lean = 0.08
+	elif actor.kind == Balance.KIND_KASSEN:
+		rate = 9.5
+		amp = 18.0
+		squash = 0.1
+		lean = 0.16
+	elif actor.kind == Balance.KIND_NIMOTON:
+		rate = 5.2
+		amp = 13.0
+		squash = 0.12
+		lean = 0.08
+	elif actor.kind == Balance.KIND_KASSEN:
+		rate = 9.5
+		amp = 18.0
+		squash = 0.1
+		lean = 0.16
 	var phase: float = float(sim.time) * rate + float(id) * 0.7
 	var hop := 0.0 if stunned else absf(sin(phase)) * amp
 	var sx := 1.0
@@ -518,6 +615,48 @@ func _enemy_pose(actor) -> Dictionary:
 	var lunge := Vector2.ZERO
 	if actor.kind == Balance.KIND_FAST and not stunned:
 		lunge = Vector2(face * 22.0 * maxf(sin(phase), 0.0), 4.0)
+	if actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "poison_windup":
+		var charge := 0.5 + 0.5 * sin(float(actor.state_left) * 18.0)
+		hop = 8.0 + charge * 15.0
+		sx += charge * 0.16
+	elif actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "empower_windup":
+		var pulse := 0.5 + 0.5 * sin(float(actor.state_left) * 16.0)
+		sx += pulse * 0.18
+		sy -= pulse * 0.12
+	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "volley_windup":
+		hop = 16.0 + absf(sin(float(actor.state_left) * 11.0)) * 18.0
+		rot = face * -0.18
+	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_windup":
+		var crouch := clampf(1.0 - float(actor.state_left) / 0.68, 0.0, 1.0)
+		hop = 0.0
+		sy += crouch * 0.18
+		rot = face * (-0.12 - crouch * 0.2)
+	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_dash":
+		var dash: Vector2 = actor.target_pos - actor.pos
+		if dash.length() > 0.01:
+			lunge = dash.normalized() * 68.0
+			rot = dash.angle() * 0.16
+	if actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "poison_windup":
+		var charge := 0.5 + 0.5 * sin(float(actor.state_left) * 18.0)
+		hop = 8.0 + charge * 15.0
+		sx += charge * 0.16
+	elif actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "empower_windup":
+		var pulse := 0.5 + 0.5 * sin(float(actor.state_left) * 16.0)
+		sx += pulse * 0.18
+		sy -= pulse * 0.12
+	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "volley_windup":
+		hop = 16.0 + absf(sin(float(actor.state_left) * 11.0)) * 18.0
+		rot = face * -0.18
+	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_windup":
+		var crouch := clampf(1.0 - float(actor.state_left) / 0.68, 0.0, 1.0)
+		hop = 0.0
+		sy += crouch * 0.18
+		rot = face * (-0.12 - crouch * 0.2)
+	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_dash":
+		var dash: Vector2 = actor.target_pos - actor.pos
+		if dash.length() > 0.01:
+			lunge = dash.normalized() * 68.0
+			rot = dash.angle() * 0.16
 	var bite := float(_bite.get(id, 0.0))
 	if bite > 0.0:
 		var toward := Vector2(sim.player_pos) - Vector2(actor.pos)
@@ -528,6 +667,10 @@ func _enemy_pose(actor) -> Dictionary:
 	var tint := Color.WHITE
 	if stunned:
 		tint = Color(1.2, 1.08, 0.55)
+	elif float(actor.empowered_left) > 0.0:
+		tint = Color(1.35, 1.18, 0.55)
+	elif float(actor.empowered_left) > 0.0:
+		tint = Color(1.35, 1.18, 0.55)
 	if flash > 0.0:
 		var kick := flash / 0.16
 		sx += 0.22 * kick
@@ -825,6 +968,7 @@ func _sync_hud() -> void:
 	coin_label.text = "コイン  %d" % sim.shown_coins()
 	build_line.text = _owned_builds()
 	_update_special_hud()
+	_sync_boss_hud()
 	if sim.time > 5.0:
 		hint.modulate.a = clampf(1.0 - (sim.time - 5.0) / 1.2, 0.0, 1.0)
 
@@ -918,11 +1062,11 @@ func _build_hud() -> void:
 	row.add_child(score_label)
 	row.add_child(coin_label)
 
-	var motion := "鉄パイプは距離に入ると振り下ろす。WASDで動く"
+	var motion := "鉄パイプ  広範囲攻撃"
 	if _who == Balance.CHAR_TAKETCHI:
-		motion = "拳は近くで出る。WASDで動く"
+		motion = "拳  近距離・高威力"
 	elif _who == Balance.CHAR_KENNY:
-		motion = "キックは足が届くと出る。WASDで動く"
+		motion = "キック  高速移動"
 	hint = UiFont.label(motion, 18, Color(1, 1, 1, 0.94))
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.place(hint, 0.26, 0.915, 0.74, 0.975)
@@ -957,6 +1101,8 @@ func _build_hud() -> void:
 	special_button = UiFont.button("必殺技 0% [Space]", 18)
 	special_button.custom_minimum_size = Vector2(0, 64)
 	special_button.pressed.connect(_activate_special)
+	special_button.add_theme_stylebox_override("disabled", UiFont.style(Color("24201b"), Color("68583b"), 2, 12))
+	special_button.add_theme_color_override("font_disabled_color", Color("c7b991"))
 	special_box.add_child(special_button)
 	_build_special_cut_in()
 
@@ -1027,6 +1173,7 @@ func _build_special_cut_in() -> void:
 func _activate_special() -> void:
 	if sim == null or not sim.begin_special():
 		return
+	_special_phase = "intro"
 	_special_face.texture = _face_texture()
 	_special_name.text = "%s  必殺技" % _who
 	_special_quote.text = str(Balance.SPECIAL_QUOTES[_who])
@@ -1039,11 +1186,10 @@ func _activate_special() -> void:
 	_special_tween = create_tween()
 	_special_tween.tween_property(_special_cut_in, "modulate:a", 1.0, 0.14)
 	_special_tween.parallel().tween_property(_special_cut_in, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_special_tween.tween_interval(0.62)
-	_special_tween.tween_callback(_resolve_special)
-	_special_tween.tween_interval(0.42)
-	_special_tween.tween_property(_special_cut_in, "modulate:a", 0.0, 0.24)
+	_special_tween.tween_interval(0.48)
+	_special_tween.tween_property(_special_cut_in, "modulate:a", 0.0, 0.2)
 	_special_tween.tween_callback(func() -> void: _special_cut_in.visible = false)
+	_special_tween.tween_callback(_resolve_special)
 	_update_special_hud()
 	queue_redraw()
 
@@ -1052,6 +1198,9 @@ func _resolve_special() -> void:
 	if not sim.resolve_special():
 		return
 	var motion_duration := Balance.special_motion_seconds(_who)
+	_special_phase = "motion"
+	_special_motion_duration = motion_duration
+	_special_motion_left = motion_duration
 	var primary := Color("f4c45a")
 	if _who == Balance.CHAR_MASSA:
 		_special_ring_left = motion_duration
@@ -1101,10 +1250,104 @@ func _update_special_hud() -> void:
 	else:
 		special_button.text = "必殺技 %d%% [Space]" % percent
 	special_button.disabled = not sim.can_activate_special()
-	if special_button.disabled:
-		special_button.modulate = Color(0.72, 0.72, 0.72, 0.88)
-	else:
-		special_button.modulate = Color.WHITE
+	special_button.modulate = Color.WHITE
+
+
+func _build_boss_hud() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 7
+	add_child(layer)
+	var root := Control.new()
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(root)
+	UiFont.full_rect(root)
+	_boss_panel = PanelContainer.new()
+	_boss_panel.visible = false
+	_boss_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.place(_boss_panel, 0.31, 0.105, 0.69, 0.19)
+	_boss_panel.add_theme_stylebox_override("panel", UiFont.style(Color("17130f"), Color("dc5946"), 3, 5))
+	root.add_child(_boss_panel)
+	var boss_col := VBoxContainer.new()
+	boss_col.add_theme_constant_override("separation", 3)
+	_boss_panel.add_child(boss_col)
+	_boss_name = UiFont.label("", 18, UiFont.PAPER)
+	_boss_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boss_col.add_child(_boss_name)
+	_boss_hp = ProgressBar.new()
+	_boss_hp.min_value = 0.0
+	_boss_hp.max_value = 100.0
+	_boss_hp.show_percentage = false
+	_boss_hp.custom_minimum_size = Vector2(0, 12)
+	_boss_hp.add_theme_stylebox_override("background", UiFont.style(Color("28201d"), Color("754339"), 1, 4))
+	_boss_hp.add_theme_stylebox_override("fill", UiFont.style(Color("e34c39"), Color("ffb55a"), 1, 3))
+	boss_col.add_child(_boss_hp)
+	_boss_banner = PanelContainer.new()
+	_boss_banner.visible = false
+	_boss_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_banner.pivot_offset = Vector2(640, 180)
+	UiFont.place(_boss_banner, 0.22, 0.2, 0.78, 0.52)
+	_boss_banner.add_theme_stylebox_override("panel", UiFont.style(Color("15120f"), Color("e0a448"), 5, 6))
+	root.add_child(_boss_banner)
+	var banner_row := HBoxContainer.new()
+	banner_row.add_theme_constant_override("separation", 20)
+	_boss_banner.add_child(banner_row)
+	_boss_banner_image = TextureRect.new()
+	_boss_banner_image.custom_minimum_size = Vector2(150, 150)
+	_boss_banner_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_boss_banner_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_boss_banner_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner_row.add_child(_boss_banner_image)
+	var banner_copy := VBoxContainer.new()
+	banner_copy.alignment = BoxContainer.ALIGNMENT_CENTER
+	banner_copy.add_theme_constant_override("separation", 8)
+	banner_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	banner_row.add_child(banner_copy)
+	_boss_banner_name = UiFont.label("", 34, UiFont.PAPER)
+	banner_copy.add_child(_boss_banner_name)
+	_boss_banner_action = UiFont.label("", 22, UiFont.BRASS)
+	_boss_banner_action.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	banner_copy.add_child(_boss_banner_action)
+	_seen_boss_alert = sim.boss_alert_serial
+
+
+func _sync_boss_hud() -> void:
+	var boss = sim.current_boss()
+	_boss_panel.visible = boss != null
+	if boss != null:
+		var name := str(Balance.BOSS_NAME[boss.kind])
+		_boss_name.text = "ボス  %s" % name
+		_boss_hp.value = 100.0 * float(boss.hp) / float(maxi(boss.max_hp, 1))
+	if sim.boss_alert_serial == _seen_boss_alert:
+		return
+	_seen_boss_alert = sim.boss_alert_serial
+	_show_boss_banner(sim.boss_alert_kind)
+
+
+func _show_boss_banner(kind: String) -> void:
+	var nimoton := kind == Balance.KIND_NIMOTON
+	_boss_banner_image.texture = UiFont.cropped(ART_NIMOTON) if nimoton else _kassen_portrait()
+	_boss_banner_name.text = "%s、乱入" % str(Balance.BOSS_NAME[kind])
+	_boss_banner_action.text = "毒液 / 群れを強化" if nimoton else "バレーアタック / 強烈な蹴り"
+	var edge := Color("a9eb4b") if nimoton else Color("f3ba47")
+	_boss_banner.add_theme_stylebox_override("panel", UiFont.style(Color("15120f"), edge, 5, 6))
+	_boss_banner.visible = true
+	_boss_banner.modulate.a = 0.0
+	_boss_banner.scale = Vector2(0.88, 0.88)
+	if _boss_banner_tween != null and _boss_banner_tween.is_running():
+		_boss_banner_tween.kill()
+	_boss_banner_tween = create_tween()
+	_boss_banner_tween.tween_property(_boss_banner, "modulate:a", 1.0, 0.16)
+	_boss_banner_tween.parallel().tween_property(_boss_banner, "scale", Vector2.ONE, 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_boss_banner_tween.tween_interval(1.8)
+	_boss_banner_tween.tween_property(_boss_banner, "modulate:a", 0.0, 0.25)
+	_boss_banner_tween.tween_callback(func() -> void: _boss_banner.visible = false)
+
+
+func _kassen_portrait() -> Texture2D:
+	var atlas := AtlasTexture.new()
+	atlas.atlas = art_kassen
+	atlas.region = Rect2(286.0, 190.0, 452.0, 640.0)
+	return atlas
 
 
 func _face_texture() -> Texture2D:
@@ -1138,11 +1381,11 @@ func _build_choice() -> void:
 	col.add_theme_constant_override("separation", 16)
 	build_root.add_child(col)
 
-	var heading := UiFont.label("%s、どれを取る" % _who, 40, UiFont.PAPER)
+	var heading := UiFont.label("強化選択", 40, UiFont.PAPER)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(heading)
-	var note := UiFont.label("時間切れは左", 22, UiFont.BRASS)
+	var note := UiFont.label("20秒以内に選択  /  時間切れで左端を選択", 22, UiFont.BRASS)
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(note)
@@ -1240,7 +1483,7 @@ func _card(index: int, id: String) -> Control:
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name.add_theme_constant_override("outline_size", 0)
 	box.add_child(name)
-	var level := UiFont.label("Lv %d  →  %d" % [current, nxt], 24, UiFont.PINK)
+	var level := UiFont.label("レベル %d  →  %d" % [current, nxt], 24, UiFont.PINK)
 	level.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	level.add_theme_constant_override("outline_size", 0)
 	box.add_child(level)
@@ -1250,7 +1493,7 @@ func _card(index: int, id: String) -> Control:
 	body.add_theme_constant_override("outline_size", 0)
 	box.add_child(body)
 	if index == 0:
-		var mark := UiFont.label("時間切れ", 18, UiFont.NAVY)
+		var mark := UiFont.label("自動選択", 18, UiFont.NAVY)
 		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		mark.add_theme_constant_override("outline_size", 0)
 		box.add_child(mark)

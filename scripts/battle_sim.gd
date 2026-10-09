@@ -14,6 +14,16 @@ class Actor extends RefCounted:
 	var radius: float
 	var stun: float
 	var knockback_scale: float
+	var base_speed: float
+	var base_touch: int
+	var empowered_left: float = 0.0
+	var phase: float = 0.0
+	var attack_timer: float = 0.0
+	var support_timer: float = 0.0
+	var attack_state: String = ""
+	var state_left: float = 0.0
+	var target_pos: Vector2 = Vector2.ZERO
+	var dash_hit: bool = false
 
 
 class Coin extends RefCounted:
@@ -24,6 +34,34 @@ class Coin extends RefCounted:
 class Cone extends RefCounted:
 	var pos: Vector2
 	var radius: float
+
+
+class BossProjectile extends RefCounted:
+	var kind: String
+	var pos: Vector2
+	var velocity: Vector2
+	var radius: float
+	var damage: int
+	var life: float
+	var age: float = 0.0
+	var flight_seconds: float
+
+
+class PoisonPool extends RefCounted:
+	var pos: Vector2
+	var radius: float
+	var life: float
+	var tick_left: float = 0.0
+
+
+var boss_projectiles: Array[BossProjectile] = []
+var poison_pools: Array[PoisonPool] = []
+var boss_alert_serial: int = 0
+var boss_alert_kind: String = ""
+var enemy_seen_this_run: Dictionary = {}
+var boss_spawn_time: float = 0.0
+var boss_spawn_attempted: bool = false
+var boss_damage_lock: float = 0.0
 
 
 var character_id: String = Balance.CHAR_MASSA
@@ -45,6 +83,7 @@ var special_active_left: float = 0.0
 var special_motion_left: float = 0.0
 var special_serial: int = 0
 var special_pending: bool = false
+var special_resolved: bool = false
 
 var enemies: Array[Actor] = []
 var coins: Array[Coin] = []
@@ -56,6 +95,8 @@ var kills_of: Dictionary = {
 	Balance.KIND_NORMAL: 0,
 	Balance.KIND_FAST: 0,
 	Balance.KIND_TANK: 0,
+	Balance.KIND_NIMOTON: 0,
+	Balance.KIND_KASSEN: 0,
 }
 var score: int = 0
 var coin_value: float = 0.0
@@ -112,6 +153,7 @@ func _init(who: String = Balance.CHAR_MASSA) -> void:
 		cones.append(cone)
 	view_rect = Rect2(player_pos - Vector2(640, 360), Vector2(1280, 720))
 	rng.randomize()
+	boss_spawn_time = rng.randf_range(35.0, 155.0)
 
 
 func shown_coins() -> int:
@@ -161,13 +203,14 @@ func begin_special() -> bool:
 	special_charge = 0.0
 	special_serial += 1
 	special_pending = true
+	special_resolved = false
 	return true
 
 
 func resolve_special() -> bool:
-	if not special_pending or finished:
+	if not special_pending or special_resolved or finished:
 		return false
-	special_pending = false
+	special_resolved = true
 	special_motion_left = Balance.special_motion_seconds(character_id)
 	if character_id == Balance.CHAR_MASSA:
 		_special_sweep()
@@ -178,10 +221,21 @@ func resolve_special() -> bool:
 	return true
 
 
+func finish_special_motion() -> bool:
+	if not special_pending or not special_resolved:
+		return false
+	special_pending = false
+	special_resolved = false
+	special_motion_left = 0.0
+	return true
+
+
 func activate_special() -> bool:
 	if not begin_special():
 		return false
-	return resolve_special()
+	if not resolve_special():
+		return false
+	return finish_special_motion()
 
 
 func step(dt: float, move_dir: Vector2) -> void:
@@ -198,8 +252,11 @@ func step(dt: float, move_dir: Vector2) -> void:
 
 func _step_slice(dt: float, move_dir: Vector2) -> void:
 	time += dt
+	boss_damage_lock = maxf(0.0, boss_damage_lock - dt)
 	_move_player(dt, move_dir)
 	_move_enemies(dt)
+	_move_boss_projectiles(dt)
+	_update_poison_pools(dt)
 	_move_coins(dt)
 	_attacks(dt)
 	special_active_left = maxf(0.0, special_active_left - dt)
@@ -219,6 +276,7 @@ func _step_slice(dt: float, move_dir: Vector2) -> void:
 		_update_spawns(dt)
 	if spawns_enabled:
 		_update_kaiju()
+		_update_boss_raid()
 	if _open_build_if_needed():
 		return
 	if time >= Balance.ROUND_SECONDS and not build_open:
@@ -263,6 +321,9 @@ func make_summary() -> Dictionary:
 		"kills_normal": int(kills_of[Balance.KIND_NORMAL]),
 		"kills_fast": int(kills_of[Balance.KIND_FAST]),
 		"kills_tank": int(kills_of[Balance.KIND_TANK]),
+		"kills_nimoton": int(kills_of[Balance.KIND_NIMOTON]),
+		"kills_kassen": int(kills_of[Balance.KIND_KASSEN]),
+		"enemy_seen": enemy_seen_this_run.keys(),
 		"coins": shown_coins(),
 		"outcome": outcome,
 		"character": character_id,
@@ -299,10 +360,194 @@ func _move_enemies(dt: float) -> void:
 		if actor.stun > 0.0:
 			actor.stun = maxf(0.0, actor.stun - dt)
 			continue
+		if actor.empowered_left > 0.0:
+			actor.empowered_left = maxf(0.0, actor.empowered_left - dt)
+			if actor.empowered_left <= 0.0:
+				actor.speed = actor.base_speed
+				actor.touch = actor.base_touch
+		if Balance.BOSS_KINDS.has(actor.kind):
+			actor.phase += dt
+			_move_boss(actor, dt)
+			continue
 		var toward := player_pos - actor.pos
 		if toward.length() < 0.001:
 			continue
 		actor.pos = _resolve(actor.pos + toward.normalized() * actor.speed * dt, actor.radius)
+
+
+func current_boss():
+	for actor in enemies:
+		if Balance.BOSS_KINDS.has(actor.kind):
+			return actor
+	return null
+
+
+func _move_boss(actor: Actor, dt: float) -> void:
+	if actor.attack_state == "kick_dash":
+		var dash := actor.target_pos - actor.pos
+		if dash.length() > 0.001:
+			actor.pos = _resolve(actor.pos + dash.normalized() * 590.0 * dt, actor.radius)
+		if not actor.dash_hit and actor.pos.distance_to(player_pos) <= actor.radius + player_radius + 34.0:
+			actor.dash_hit = true
+			_boss_hit_player(38)
+			var away := player_pos - actor.pos
+			if away.length() > 0.001:
+				player_pos = _resolve(player_pos + away.normalized() * 86.0, player_radius)
+		actor.state_left -= dt
+		if actor.state_left <= 0.0:
+			actor.attack_state = ""
+			actor.attack_timer = 1.25
+		return
+	if actor.attack_state != "":
+		actor.state_left -= dt
+		if actor.state_left <= 0.0:
+			_resolve_boss_action(actor)
+		return
+	actor.attack_timer -= dt
+	var distance := actor.pos.distance_to(player_pos)
+	if actor.kind == Balance.KIND_NIMOTON:
+		actor.support_timer -= dt
+		if actor.support_timer <= 0.0:
+			actor.attack_state = "empower_windup"
+			actor.state_left = 0.9
+			return
+		if actor.attack_timer <= 0.0:
+			actor.attack_state = "poison_windup"
+			actor.target_pos = player_pos
+			actor.state_left = 0.72
+			return
+		_move_boss_range(actor, 250.0, dt)
+		return
+	if actor.attack_timer <= 0.0:
+		actor.target_pos = player_pos
+		if distance < 340.0 and rng.randf() < 0.58:
+			actor.attack_state = "kick_windup"
+			actor.state_left = 0.68
+		else:
+			actor.attack_state = "volley_windup"
+			actor.state_left = 0.82
+		return
+	_move_boss_range(actor, 290.0, dt)
+
+
+func _move_boss_range(actor: Actor, desired_range: float, dt: float) -> void:
+	var toward := player_pos - actor.pos
+	if toward.length() < 0.001:
+		return
+	var direction := toward.normalized()
+	var distance := toward.length()
+	var move := Vector2.ZERO
+	if distance > desired_range + 28.0:
+		move = direction
+	elif distance < desired_range - 34.0:
+		move = -direction
+	else:
+		move = direction.orthogonal() * signf(sin(actor.phase * 1.7))
+	actor.pos = _resolve(actor.pos + move * actor.speed * dt, actor.radius)
+
+
+func _resolve_boss_action(actor: Actor) -> void:
+	match actor.attack_state:
+		"poison_windup":
+			_launch_boss_projectile(actor, Balance.BOSS_POISON, actor.target_pos, 20, 285.0)
+			actor.attack_timer = 2.4
+		"empower_windup":
+			_empower_nearby(actor)
+			actor.support_timer = 7.2
+			actor.attack_timer = 1.4
+		"volley_windup":
+			_launch_boss_projectile(actor, Balance.BOSS_VOLLEY, actor.target_pos, 27, 365.0)
+			actor.attack_timer = 2.7
+		"kick_windup":
+			actor.attack_state = "kick_dash"
+			actor.state_left = 0.52
+			actor.dash_hit = false
+			return
+	actor.attack_state = ""
+
+
+func _empower_nearby(boss: Actor) -> void:
+	for actor in enemies:
+		if actor == boss or Balance.BOSS_KINDS.has(actor.kind):
+			continue
+		if actor.kind != Balance.KIND_NORMAL and actor.kind != Balance.KIND_FAST:
+			continue
+		if actor.pos.distance_to(boss.pos) > 560.0:
+			continue
+		if actor.empowered_left <= 0.0:
+			actor.speed = actor.base_speed * 1.55
+			actor.touch = ceili(float(actor.base_touch) * 1.5)
+		actor.empowered_left = 8.0
+
+
+func _launch_boss_projectile(boss: Actor, kind: String, target: Vector2, damage: int, speed: float) -> void:
+	var projectile := BossProjectile.new()
+	projectile.kind = kind
+	projectile.pos = boss.pos + Vector2(0.0, -boss.radius * 0.35)
+	projectile.radius = 20.0 if kind == Balance.BOSS_VOLLEY else 18.0
+	projectile.damage = damage
+	var direction := target - projectile.pos
+	if direction.length() < 0.001:
+		direction = Vector2.RIGHT
+	projectile.velocity = direction.normalized() * speed
+	projectile.flight_seconds = maxf(0.35, direction.length() / speed)
+	projectile.life = projectile.flight_seconds + 0.16
+	boss_projectiles.append(projectile)
+
+
+func _move_boss_projectiles(dt: float) -> void:
+	var keep: Array[BossProjectile] = []
+	for projectile in boss_projectiles:
+		projectile.age += dt
+		projectile.life -= dt
+		projectile.pos += projectile.velocity * dt
+		var hit := projectile.pos.distance_to(player_pos) <= projectile.radius + player_radius
+		if hit:
+			_boss_hit_player(projectile.damage)
+			if projectile.kind == Balance.BOSS_POISON:
+				_add_poison_pool(projectile.pos)
+		elif projectile.life <= 0.0 and projectile.kind == Balance.BOSS_POISON:
+			_add_poison_pool(projectile.pos)
+		if not hit and projectile.life > 0.0:
+			keep.append(projectile)
+	boss_projectiles = keep
+
+
+func _add_poison_pool(pos: Vector2) -> void:
+	var pool := PoisonPool.new()
+	pool.pos = Vector2(pos)
+	pool.radius = 86.0
+	pool.life = 5.5
+	pool.tick_left = 0.2
+	poison_pools.append(pool)
+
+
+func _update_poison_pools(dt: float) -> void:
+	var keep: Array[PoisonPool] = []
+	for pool in poison_pools:
+		pool.life -= dt
+		pool.tick_left -= dt
+		if pool.life > 0.0 and player_pos.distance_to(pool.pos) <= pool.radius + player_radius and pool.tick_left <= 0.0:
+			_boss_hit_player(4)
+			pool.tick_left = 0.7
+		if pool.life > 0.0:
+			keep.append(pool)
+	poison_pools = keep
+
+
+func _boss_hit_player(raw_damage: int) -> void:
+	if not contact_enabled or time < Balance.INVULN_SECONDS or boss_damage_lock > 0.0 or finished:
+		return
+	boss_damage_lock = 0.42
+	var damage := Balance.apply_damage_scale(raw_damage, damage_taken_scale)
+	player_hp -= damage
+	hurt_serial += 1
+	if player_hp <= 0:
+		player_hp = 0
+		_pending_offers = 0
+		build_open = false
+		current_choices = []
+		_end("down")
 
 
 func _move_coins(dt: float) -> void:
@@ -396,7 +641,9 @@ func _pulse() -> void:
 	for actor in enemies:
 		if player_pos.distance_to(actor.pos) > radius:
 			continue
-		if actor.kind == Balance.KIND_TANK:
+		if Balance.BOSS_KINDS.has(actor.kind):
+			actor.stun = 0.35
+		elif actor.kind == Balance.KIND_TANK:
 			actor.stun = Balance.STUN_TANK_SECONDS
 		else:
 			actor.stun = Balance.STUN_SECONDS
@@ -500,7 +747,22 @@ func _update_kaiju() -> void:
 		_spawn_kind(Balance.KIND_TANK, when)
 
 
+func _update_boss_raid() -> void:
+	if boss_spawn_attempted or time < boss_spawn_time:
+		return
+	if enemies.size() >= Balance.MAX_ALIVE:
+		boss_spawn_time = time + 5.0
+		return
+	boss_spawn_attempted = true
+	if rng.randf() >= Balance.BOSS_SPAWN_CHANCE:
+		return
+	var kind := Balance.KIND_NIMOTON if rng.randf() < 0.5 else Balance.KIND_KASSEN
+	_spawn_kind(kind, time)
+
+
 func _spawn_kind(kind: String, elapsed: float) -> bool:
+	if enemies.size() >= Balance.MAX_ALIVE:
+		return false
 	var stats: Dictionary = Balance.ENEMIES[kind]
 	var found: Array = _find_spawn(float(stats.radius))
 	if found.is_empty():
@@ -508,6 +770,10 @@ func _spawn_kind(kind: String, elapsed: float) -> bool:
 	var actor := _make_actor(kind, elapsed)
 	actor.pos = found[0]
 	enemies.append(actor)
+	enemy_seen_this_run[kind] = true
+	if Balance.BOSS_KINDS.has(kind):
+		boss_alert_kind = kind
+		boss_alert_serial += 1
 	max_alive_seen = maxi(max_alive_seen, enemies.size())
 	return true
 
@@ -519,12 +785,18 @@ func _make_actor(kind: String, elapsed: float) -> Actor:
 	_next_id += 1
 	actor.kind = kind
 	actor.speed = float(stats.speed)
+	actor.base_speed = actor.speed
 	actor.touch = int(stats.touch)
+	actor.base_touch = actor.touch
 	actor.radius = float(stats.radius)
 	actor.knockback_scale = float(stats.knockback_scale)
 	actor.stun = 0.0
 	if kind == Balance.KIND_TANK:
 		actor.max_hp = int(stats.hp)
+	elif Balance.BOSS_KINDS.has(kind):
+		actor.max_hp = ceili(float(stats.hp) * (1.0 + clampf(elapsed / Balance.ROUND_SECONDS, 0.0, 1.0) * 0.35))
+		actor.attack_timer = 2.0 if kind == Balance.KIND_NIMOTON else 2.8
+		actor.support_timer = 4.6
 	else:
 		actor.max_hp = Balance.scaled_hp(int(stats.hp), elapsed)
 	actor.hp = actor.max_hp

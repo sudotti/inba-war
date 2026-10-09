@@ -70,6 +70,38 @@ const KILL_CAP_TANK := 6
 const KIND_NORMAL := "normal"
 const KIND_FAST := "fast"
 const KIND_TANK := "tank"
+const KIND_NIMOTON := "boss_nimoton"
+const KIND_KASSEN := "boss_kassen"
+const BOSS_KINDS: Array[String] = [KIND_NIMOTON, KIND_KASSEN]
+const BOSS_SPAWN_CHANCE := 0.12
+const BOSS_NAME := {
+	KIND_NIMOTON: "ニーモトン",
+	KIND_KASSEN: "カッセン",
+}
+const ENEMY_KINDS: Array[String] = [KIND_NORMAL, KIND_FAST, KIND_TANK, KIND_NIMOTON, KIND_KASSEN]
+const ENEMY_KILL_SUMMARY := {
+	KIND_NORMAL: "kills_normal",
+	KIND_FAST: "kills_fast",
+	KIND_TANK: "kills_tank",
+	KIND_NIMOTON: "kills_nimoton",
+	KIND_KASSEN: "kills_kassen",
+}
+const ENEMY_NAME := {
+	KIND_NORMAL: "黒服の手下",
+	KIND_FAST: "赤目のイノシシ",
+	KIND_TANK: "印旛沼の怪獣",
+	KIND_NIMOTON: "ニーモトン",
+	KIND_KASSEN: "カッセン",
+}
+const ENEMY_DESCRIPTION := {
+	KIND_NORMAL: "数で迫る黒服。囲まれる前に距離を取れ。",
+	KIND_FAST: "一直線に突っ込む。進路を読んでかわす。",
+	KIND_TANK: "巨体と一撃が脅威。吹き飛ばしにくい。",
+	KIND_NIMOTON: "毒液で地面を侵し、手下を覚醒させる。",
+	KIND_KASSEN: "バレーボール弾と強烈な蹴りで襲う。",
+}
+const BOSS_POISON := "poison"
+const BOSS_VOLLEY := "volley"
 
 const BUTTO := "buttobashi"
 const ONIGIRI := "onigiri"
@@ -144,52 +176,74 @@ const ENEMIES := {
 		"radius": 48.0,
 		"knockback_scale": 0.35,
 	},
+	KIND_NIMOTON: {
+		"hp": 1280,
+		"speed": 86.0,
+		"touch": 32,
+		"radius": 62.0,
+		"knockback_scale": 0.08,
+	},
+	KIND_KASSEN: {
+		"hp": 1040,
+		"speed": 108.0,
+		"touch": 38,
+		"radius": 54.0,
+		"knockback_scale": 0.12,
+	},
 }
 
 const SCORE := {
 	KIND_NORMAL: 10,
 	KIND_FAST: 30,
 	KIND_TANK: 200,
+	KIND_NIMOTON: 1800,
+	KIND_KASSEN: 1600,
 }
 
 const COIN_CHANCE := {
 	KIND_NORMAL: 0.40,
 	KIND_FAST: 0.70,
 	KIND_TANK: 1.0,
+	KIND_NIMOTON: 1.0,
+	KIND_KASSEN: 1.0,
 }
 
 const COIN_COUNT := {
 	KIND_NORMAL: 1,
 	KIND_FAST: 1,
 	KIND_TANK: 3,
+	KIND_NIMOTON: 10,
+	KIND_KASSEN: 8,
 }
 
 const KIND_LABEL := {
 	KIND_NORMAL: "通常",
 	KIND_FAST: "高速",
 	KIND_TANK: "耐久",
+	KIND_NIMOTON: "ニーモトン",
+	KIND_KASSEN: "カッセン",
 }
 
 const UPGRADE_NAME := {
-	BUTTO: "ぶっ飛ばすよ?",
-	ONIGIRI: "ばあちゃんのおにぎり",
-	KENKYAKU: "田舎の健脚",
-	KANE: "金欲しくね",
-	PURITORA: "プリとらね?",
-	MEGUMI: "印旛沼の恵み",
-	OKOZUKAI: "お小遣い",
+	BUTTO: "豪打",
+	ONIGIRI: "特製おにぎり",
+	KENKYAKU: "健脚",
+	KANE: "銭の引力",
+	PURITORA: "プリクラ衝撃波",
+	MEGUMI: "沼の恵み",
+	OKOZUKAI: "臨時収入",
 	MAAI: "間合い",
 	RENDA: "連打",
 }
 
 const UPGRADE_SHORT := {
-	BUTTO: "ぶっ飛ばす",
+	BUTTO: "豪打",
 	ONIGIRI: "おにぎり",
 	KENKYAKU: "健脚",
-	KANE: "金",
-	PURITORA: "プリとら",
-	MEGUMI: "恵み",
-	OKOZUKAI: "お小遣い",
+	KANE: "銭引力",
+	PURITORA: "衝撃波",
+	MEGUMI: "沼の恵み",
+	OKOZUKAI: "臨時収入",
 	MAAI: "間合い",
 	RENDA: "連打",
 }
@@ -267,8 +321,14 @@ static func special_motion_seconds(who: String) -> float:
 	return SPECIAL_MASSA_MOTION_SECONDS
 
 
-static func score_from_kills(normal: int, fast: int, tank: int) -> int:
-	return normal * SCORE[KIND_NORMAL] + fast * SCORE[KIND_FAST] + tank * SCORE[KIND_TANK]
+static func score_from_kills(normal: int, fast: int, tank: int, nimoton: int = 0, kassen: int = 0) -> int:
+	return (
+		normal * SCORE[KIND_NORMAL]
+		+ fast * SCORE[KIND_FAST]
+		+ tank * SCORE[KIND_TANK]
+		+ nimoton * SCORE[KIND_NIMOTON]
+		+ kassen * SCORE[KIND_KASSEN]
+	)
 
 
 static func kills_within_cap(normal: int, fast: int, tank: int) -> bool:
@@ -298,23 +358,23 @@ static func kind_for_roll(elapsed: float, roll: float) -> String:
 static func upgrade_blurb(id: String, next_level: int) -> String:
 	match id:
 		BUTTO:
-			return "重く飛ばす。攻撃 +%d%%、吹き飛ばし +%d%%" % [15 * next_level, 15 * next_level]
+			return "攻撃力 +%d%% / 吹き飛ばし +%d%%" % [15 * next_level, 15 * next_level]
 		ONIGIRI:
-			return "その場で 20 回復。最大HP +%d" % (20 * next_level)
+			return "最大HP +%d / 増加分を即時回復" % (20 * next_level)
 		KENKYAKU:
-			return "足が速くなる。移動 +%d%%" % (8 * next_level)
+			return "移動速度 +%d%%" % (8 * next_level)
 		KANE:
-			return "コインが寄ってくる。半径 %d" % int(magnet_radius(next_level))
+			return "コイン回収範囲 +%d" % int(magnet_radius(next_level))
 		PURITORA:
-			return "周りを止める。%.1f秒ごと、半径 %d" % [puritora_interval(next_level), int(puritora_radius(next_level))]
+			return "周囲をスタン / %.1f秒間隔・半径 %d" % [puritora_interval(next_level), int(puritora_radius(next_level))]
 		MEGUMI:
-			return "10体倒すごとに %d 回復" % megumi_heal(next_level)
+			return "10撃破ごとにHP %d回復" % megumi_heal(next_level)
 		OKOZUKAI:
-			return "コインが増える。+%d%%" % (25 * next_level)
+			return "獲得コイン +%d%%" % (25 * next_level)
 		MAAI:
-			return "攻撃が遠くまで届く。範囲 +%d%%" % (14 * next_level)
+			return "自動攻撃範囲 +%d%%" % (14 * next_level)
 		RENDA:
-			return "攻撃が早く出る。間隔 -%d%%" % (8 * next_level)
+			return "攻撃間隔 -%d%%" % (8 * next_level)
 	return ""
 
 

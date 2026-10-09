@@ -51,31 +51,34 @@ func _ready() -> void:
 	margin.add_child(col)
 
 	var result: Dictionary = SaveStore.last_result
-	col.add_child(UiFont.label("結果", 26, UiFont.BRASS))
+	col.add_child(UiFont.label("戦績", 26, UiFont.BRASS))
 	if result.is_empty():
-		col.add_child(UiFont.label("記録がない", 36, UiFont.PAPER))
+		col.add_child(UiFont.label("記録なし", 36, UiFont.PAPER))
 	else:
-		var outcome := "3分生き残った" if str(result.get("outcome", "")) == "clear" else "力尽きた"
+		var outcome := "3分間生存" if str(result.get("outcome", "")) == "clear" else "戦闘不能"
 		col.add_child(UiFont.label(outcome, 30, UiFont.PAPER))
 		var who := str(result.get("character", Balance.CHAR_MASSA))
 		col.add_child(UiFont.label(who, 22, UiFont.CREAM))
 		col.add_child(UiFont.label("スコア  %d" % int(result.get("score", 0)), 52, UiFont.PAPER))
 		if bool(result.get("best_updated", false)):
-			col.add_child(UiFont.label("自己ベストを更新した", 26, UiFont.PINK))
+			col.add_child(UiFont.label("自己ベスト更新", 26, UiFont.PINK))
 		else:
 			var best := int(result.get("best_score", 0))
 			var when := str(result.get("best_datetime", ""))
 			var line := "自己ベスト  まだない" if when == "" else "自己ベスト  %d" % best
 			col.add_child(UiFont.label(line, 24, UiFont.PAPER))
-		col.add_child(UiFont.label("獲得コイン  %d枚" % int(result.get("coins", 0)), 26, UiFont.YELLOW))
+		col.add_child(UiFont.label("獲得  %d イェン" % int(result.get("coins", 0)), 26, UiFont.YELLOW))
 		_yen = UiFont.label("", 22, UiFont.CREAM)
 		col.add_child(_yen)
-		col.add_child(UiFont.label("撃破  %d    通常 %d / 高速 %d / 耐久 %d" % [
+		col.add_child(UiFont.label("撃破 %d   手下 %d / イノシシ %d / 怪獣 %d" % [
 			int(result.get("kills", 0)),
 			int(result.get("kills_normal", 0)),
 			int(result.get("kills_fast", 0)),
 			int(result.get("kills_tank", 0)),
 		], 22, UiFont.PAPER))
+		var bosses := int(result.get("kills_nimoton", 0)) + int(result.get("kills_kassen", 0))
+		if bosses > 0:
+			col.add_child(UiFont.label("ボス撃破  ニーモトン %d / カッセン %d" % [int(result.get("kills_nimoton", 0)), int(result.get("kills_kassen", 0))], 20, UiFont.BRASS))
 
 	_fragment = UiFont.label("", 24, UiFont.YELLOW)
 	_fragment.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -93,13 +96,13 @@ func _ready() -> void:
 	nav.add_theme_constant_override("separation", 16)
 	nav.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(nav)
-	_back = UiFont.button("タイトルへ", 26)
+	_back = UiFont.button("タイトル", 26)
 	_back.custom_minimum_size = Vector2(250, 64)
 	_back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/title.tscn")
 	)
 	nav.add_child(_back)
-	_shop = UiFont.button("なかむらショップ", 24)
+	_shop = UiFont.button("商店", 24)
 	_shop.custom_minimum_size = Vector2(280, 64)
 	_shop.pressed.connect(func() -> void:
 		SaveStore.shop_return = "res://scenes/result.tscn"
@@ -122,17 +125,17 @@ func _resolve() -> void:
 	_reward = SaveStore.reward_fragments(str(result.get("outcome", "")), int(result.get("kills", 0)))
 	var locked := SaveStore.locked_friends()
 	if _reward <= 0:
-		_finish("今回はかけら無し")
+		_finish("獲得かけらなし")
 	elif locked.is_empty():
 		var yen := _reward * Balance.FRAGMENT_EXCHANGE
 		SaveStore.add_yen(yen)
-		_finish("余ったかけらを %dイェンにした" % yen)
+		_finish("余剰かけらを %d イェンに交換" % yen)
 	elif locked.size() == 1:
 		var who := str(locked[0])
 		var info := SaveStore.grant_fragments(who, _reward)
 		_finish(_grant_line(who, info))
 	else:
-		_fragment.text = "かけら%dつ。誰に渡す" % _reward
+		_fragment.text = "かけら %d 個  /  解放先を選択" % _reward
 		_set_nav(false)
 		_choice.add_child(_pick_button(Balance.CHAR_TAKETCHI))
 		_choice.add_child(_pick_button(Balance.CHAR_KENNY))
@@ -157,11 +160,11 @@ func _give(who: String) -> void:
 
 
 func _grant_line(who: String, info: Dictionary) -> String:
-	var line := "%sのかけら +%d（%d/5）" % [who, int(info.applied), SaveStore.fragments_of(who)]
+	var line := "%s  かけら +%d（%d / 5）" % [who, int(info.applied), SaveStore.fragments_of(who)]
 	if bool(info.unlocked):
-		line += "  来た"
+		line += "  加入"
 	if int(info.yen) > 0:
-		line += "  余り %dイェン" % int(info.yen)
+		line += "  換金 +%d イェン" % int(info.yen)
 	return line
 
 
@@ -185,4 +188,4 @@ func _set_nav(enabled: bool) -> void:
 
 func _sync_yen() -> void:
 	if _yen != null:
-		_yen.text = "所持  100イェン %d枚" % int(SaveStore.data.yen)
+		_yen.text = "所持  %d イェン" % int(SaveStore.data.yen)

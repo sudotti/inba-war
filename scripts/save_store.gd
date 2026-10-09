@@ -50,6 +50,35 @@ func commit_run(summary: Dictionary) -> Dictionary:
 	var coins := int(summary.get("coins", 0))
 	if coins > 0:
 		data.yen = int(data.yen) + coins
+	var enemy_kills: Dictionary = data.enemy_kills
+	var enemy_seen: Array = data.enemy_seen
+	var seen_this_run = summary.get("enemy_seen", [])
+	for kind in Balance.ENEMY_KINDS:
+		var count := int(summary.get(Balance.ENEMY_KILL_SUMMARY[kind], 0))
+		enemy_kills[kind] = int(enemy_kills.get(kind, 0)) + count
+		if count > 0 and not enemy_seen.has(kind):
+			enemy_seen.append(kind)
+	if typeof(seen_this_run) == TYPE_ARRAY:
+		for kind in seen_this_run:
+			if Balance.ENEMY_KINDS.has(str(kind)) and not enemy_seen.has(str(kind)):
+				enemy_seen.append(str(kind))
+	data.enemy_kills = enemy_kills
+	data.enemy_seen = enemy_seen
+	var local_scores: Array = data.local_scores.duplicate(true)
+	local_scores.append({
+		"name": shown_name(),
+		"score": int(summary.get("score", 0)),
+		"character": str(summary.get("character", Balance.CHAR_MASSA)),
+		"date": _now(),
+	})
+	local_scores.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a.score) == int(b.score):
+			return str(a.date) > str(b.date)
+		return int(a.score) > int(b.score)
+	)
+	if local_scores.size() > 10:
+		local_scores.resize(10)
+	data.local_scores = local_scores
 	var updated := false
 	var score := int(summary.get("score", 0))
 	if score > int(data.best_score):
@@ -65,6 +94,8 @@ func commit_run(summary: Dictionary) -> Dictionary:
 			"kills_normal": int(summary.get("kills_normal", 0)),
 			"kills_fast": int(summary.get("kills_fast", 0)),
 			"kills_tank": int(summary.get("kills_tank", 0)),
+			"kills_nimoton": int(summary.get("kills_nimoton", 0)),
+			"kills_kassen": int(summary.get("kills_kassen", 0)),
 			"character": str(summary.get("character", Balance.CHAR_MASSA)),
 			"version": Balance.VERSION,
 			"datetime": when,
@@ -238,7 +269,7 @@ func _add_one(who: String) -> bool:
 
 func _fresh() -> Dictionary:
 	return {
-		"schema": 1,
+		"schema": 2,
 		"player_id": _uuid(),
 		"display_name": "",
 		"yen": 0,
@@ -256,6 +287,15 @@ func _fresh() -> Dictionary:
 		"best_character": "",
 		"best_datetime": "",
 		"pending_score": null,
+		"enemy_seen": [],
+		"enemy_kills": {
+			Balance.KIND_NORMAL: 0,
+			Balance.KIND_FAST: 0,
+			Balance.KIND_TANK: 0,
+			Balance.KIND_NIMOTON: 0,
+			Balance.KIND_KASSEN: 0,
+		},
+		"local_scores": [],
 		"selected": Balance.CHAR_MASSA,
 	}
 
@@ -292,6 +332,35 @@ func _coerce(parsed: Dictionary) -> Dictionary:
 	base.best_datetime = str(parsed.get("best_datetime", ""))
 	var pending = parsed.get("pending_score", null)
 	base.pending_score = pending if typeof(pending) == TYPE_DICTIONARY else null
+	var seen = parsed.get("enemy_seen", [])
+	if typeof(seen) == TYPE_ARRAY:
+		for kind in seen:
+			if Balance.ENEMY_KINDS.has(str(kind)) and not base.enemy_seen.has(str(kind)):
+				base.enemy_seen.append(str(kind))
+	var saved_kills = parsed.get("enemy_kills", {})
+	if typeof(saved_kills) == TYPE_DICTIONARY:
+		for kind in Balance.ENEMY_KINDS:
+			base.enemy_kills[kind] = maxi(0, int(saved_kills.get(kind, 0)))
+			if int(base.enemy_kills[kind]) > 0 and not base.enemy_seen.has(kind):
+				base.enemy_seen.append(kind)
+	var saved_scores = parsed.get("local_scores", [])
+	if typeof(saved_scores) == TYPE_ARRAY:
+		for entry in saved_scores:
+			if typeof(entry) != TYPE_DICTIONARY:
+				continue
+			base.local_scores.append({
+				"name": str(entry.get("name", "ななし")),
+				"score": maxi(0, int(entry.get("score", 0))),
+				"character": str(entry.get("character", Balance.CHAR_MASSA)),
+				"date": str(entry.get("date", "")),
+			})
+		base.local_scores.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			if int(a.score) == int(b.score):
+				return str(a.date) > str(b.date)
+			return int(a.score) > int(b.score)
+		)
+		if base.local_scores.size() > 10:
+			base.local_scores.resize(10)
 	return base
 
 

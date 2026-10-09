@@ -43,7 +43,7 @@ func _ready() -> void:
 	col.add_theme_constant_override("separation", 10)
 	margin.add_child(col)
 
-	col.add_child(UiFont.label("なかむらショップ", 36, UiFont.PAPER))
+	col.add_child(UiFont.label("なかむら商店", 36, UiFont.PAPER))
 	_yen = UiFont.label("", 26, UiFont.BRASS)
 	col.add_child(_yen)
 	_friends = UiFont.label("", 20, UiFont.CREAM)
@@ -66,16 +66,16 @@ func _ready() -> void:
 
 
 func _refresh() -> void:
-	_yen.text = "100イェン  %d枚" % int(SaveStore.data.yen)
-	_friends.text = "タケッチ  %d/5    ケニー  %d/5" % [SaveStore.fragments_of(Balance.CHAR_TAKETCHI), SaveStore.fragments_of(Balance.CHAR_KENNY)]
+	_yen.text = "所持  %d イェン" % int(SaveStore.data.yen)
+	_friends.text = "解放かけら  タケッチ %d/5    ケニー %d/5" % [SaveStore.fragments_of(Balance.CHAR_TAKETCHI), SaveStore.fragments_of(Balance.CHAR_KENNY)]
 	var locked := SaveStore.locked_friends()
 	var owns := bool(SaveStore.data.has_uniform)
 	if owns and locked.is_empty():
-		_speech.text = "そろってる。\n校庭で待ってる"
+		_speech.text = "全員加入済み。\n出撃準備完了。"
 	elif locked.is_empty():
-		_speech.text = "二人は来てる。\n制服はまだある"
+		_speech.text = "仲間は全員加入済み。\n制服を販売中。"
 	else:
-		_speech.text = "制服と、かけらを置いてある"
+		_speech.text = "制服と解放かけらを販売中。"
 	for child in _goods.get_children():
 		_goods.remove_child(child)
 		child.free()
@@ -86,11 +86,11 @@ func _refresh() -> void:
 func _uniform_block(owns: bool) -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
-	box.add_child(_ink("印旛中学校の制服", 26))
+	box.add_child(_ink("印旛中学校制服", 26))
 	if owns:
-		box.add_child(_ink("持ってる。クローゼットで着られる", 20))
+		box.add_child(_ink("所持中。衣装選択から着用できます。", 20))
 	else:
-		box.add_child(_ink("黒い詰襟。三人とも着られる", 20))
+		box.add_child(_ink("三人共通の黒い詰襟。", 20))
 		var buy := UiFont.button("600イェン", 26)
 		buy.custom_minimum_size = Vector2(0, 64)
 		buy.pressed.connect(_buy_uniform)
@@ -101,11 +101,11 @@ func _uniform_block(owns: bool) -> Control:
 func _fragment_block(locked: Array[String]) -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
-	box.add_child(_ink("ともだちのかけら", 26))
+	box.add_child(_ink("仲間の解放かけら", 26))
 	if locked.is_empty():
-		box.add_child(_ink("棚は空。余りは300イェンになる", 20))
+		box.add_child(_ink("未解放の仲間はいません。余剰分は換金されます。", 20))
 		return box
-	box.add_child(_ink("五つで加わる。戦闘のあとにも渡せる", 20))
+	box.add_child(_ink("5個で加入。戦闘後の報酬でも入手できます。", 20))
 	if locked.size() == 1:
 		var who := str(locked[0])
 		var buy := UiFont.button("%s  400イェン" % who, 26)
@@ -113,7 +113,7 @@ func _fragment_block(locked: Array[String]) -> Control:
 		buy.pressed.connect(_buy_fragment.bind(who))
 		box.add_child(buy)
 	else:
-		box.add_child(_ink("400イェン。渡す相手を選ぶ", 20))
+		box.add_child(_ink("400イェン。解放する仲間を選択。", 20))
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
 		row.add_child(_target_button(Balance.CHAR_TAKETCHI))
@@ -139,26 +139,26 @@ func _ink(text: String, size: int) -> Label:
 func _buy_uniform() -> void:
 	var result := SaveStore.buy_uniform()
 	if result == "poor":
-		_say("足りない", true)
+		_say("イェンが足りません。", true)
 	elif result == "ok":
-		_say("制服が届いた", false)
+		_say("制服を入手しました。", false)
 	_refresh()
 
 
 func _buy_fragment(who: String) -> void:
 	var result := SaveStore.buy_fragment(who)
 	if result == "poor":
-		_say("足りない", true)
+		_say("イェンが足りません。", true)
 	elif result == "unlocked":
-		_say("%sが来た" % who, false)
+		_say("%sが加入しました。" % who, false)
 	elif result == "ok":
 		var target := who
 		var locked := SaveStore.locked_friends()
 		if locked.size() == 1:
 			target = str(locked[0])
-		_say("%s  %d/5" % [target, SaveStore.fragments_of(target)], false)
+		_say("%s  %d / 5" % [target, SaveStore.fragments_of(target)], false)
 	elif result == "none":
-		_say("かけらは無い", false)
+		_say("購入できるかけらはありません。", false)
 	_refresh()
 
 

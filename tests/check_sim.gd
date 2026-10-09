@@ -118,6 +118,10 @@ func _specials() -> void:
 	_eq(sim.special_charge, 0.0, "special consumes charge")
 	_true(not sim.resolve_special(), "special resolves only once")
 	_true(sim.special_motion_left > 0.0, "special motion starts")
+	_true(sim.special_pending, "special remains locked through motion")
+	sim.step(1.0, Vector2.ZERO)
+	_near(sim.time, 0.0, "motion holds simulation clock")
+	_true(sim.finish_special_motion(), "special motion finishes explicitly")
 
 	var build_sim = BattleSim.new()
 	build_sim.spawns_enabled = false
@@ -130,7 +134,9 @@ func _specials() -> void:
 	_true(not build_sim.build_open, "kill build waits during special motion")
 	build_sim.step(0.5, Vector2.ZERO)
 	_true(not build_sim.build_open, "kill build remains queued during motion")
-	build_sim.step(Balance.SPECIAL_MASSA_MOTION_SECONDS, Vector2.ZERO)
+	_near(build_sim.time, 0.0, "build delay freezes battle clock")
+	_true(build_sim.finish_special_motion(), "build delay waits for motion callback")
+	build_sim.step(0.05, Vector2.ZERO)
 	_true(build_sim.build_open, "kill build opens after special motion")
 
 	sim = BattleSim.new()
@@ -154,6 +160,54 @@ func _specials() -> void:
 	sim.contact_enabled = false
 	sim.step(0.2, Vector2.ZERO)
 	_near(sim.special_active_left, 5.8, "special timer ticks")
+
+	var nimo = BattleSim.new()
+	nimo.time = 5.0
+	var nimo_actor = nimo._make_actor(Balance.KIND_NIMOTON, nimo.time)
+	nimo_actor.pos = nimo.player_pos - Vector2(200, 0)
+	nimo.enemies.append(nimo_actor)
+	var empowered = nimo.debug_place(Balance.KIND_NORMAL, nimo.player_pos + Vector2(70, 0), 12, 80.0)
+	nimo._empower_nearby(nimo_actor)
+	_near(empowered.speed, 124.0, "nimoton empowers minions")
+	_eq(empowered.touch, 9, "nimoton boosts contact damage")
+	nimo._launch_boss_projectile(nimo_actor, Balance.BOSS_POISON, nimo.player_pos, 12, 1000.0)
+	nimo._move_boss_projectiles(0.2)
+	_true(nimo.player_hp < 100, "nimoton poison projectile hits")
+	_eq(nimo.poison_pools.size(), 1, "nimoton leaves poison pool")
+	nimo.boss_damage_lock = 0.0
+	nimo.poison_pools[0].pos = nimo.player_pos
+	nimo.poison_pools[0].tick_left = 0.0
+	var hp_before_poison: int = nimo.player_hp
+	nimo._update_poison_pools(0.05)
+	_true(nimo.player_hp < hp_before_poison, "poison pool damages player")
+
+	var kassen = BattleSim.new()
+	kassen.time = 5.0
+	var kassen_actor = kassen._make_actor(Balance.KIND_KASSEN, kassen.time)
+	kassen_actor.pos = kassen.player_pos + Vector2(220, 0)
+	kassen.enemies.append(kassen_actor)
+	kassen_actor.attack_state = "volley_windup"
+	kassen_actor.state_left = 0.01
+	kassen_actor.target_pos = kassen.player_pos
+	kassen._move_boss(kassen_actor, 0.02)
+	_eq(kassen.boss_projectiles.size(), 1, "kassen launches volleyball")
+	_eq(kassen.boss_projectiles[0].kind, Balance.BOSS_VOLLEY, "kassen ball type")
+	kassen_actor.attack_state = "kick_windup"
+	kassen_actor.state_left = 0.01
+	kassen_actor.target_pos = kassen.player_pos
+	kassen._move_boss(kassen_actor, 0.02)
+	for _i in 14:
+		kassen._move_boss(kassen_actor, 0.05)
+	_true(kassen.player_hp < 100, "kassen kick dash hits")
+
+	var raid = BattleSim.new()
+	raid.rng.seed = 17
+	raid.view_rect = Rect2(raid.player_pos - Vector2(20, 20), Vector2(40, 40))
+	_true(raid._spawn_kind(Balance.KIND_NIMOTON, 90.0), "named boss spawns offscreen")
+	_eq(raid.boss_alert_serial, 1, "boss announces intrusion")
+	_eq(raid.boss_alert_kind, Balance.KIND_NIMOTON, "boss alert identity")
+	_true(raid.current_boss() != null, "boss health target available")
+	_true(raid.enemy_seen_this_run.has(Balance.KIND_NIMOTON), "boss enters bestiary encounter log")
 
 
 func _combat() -> void:
@@ -466,6 +520,9 @@ func _save() -> void:
 		"kills_normal": 4,
 		"kills_fast": 0,
 		"kills_tank": 0,
+		"kills_nimoton": 0,
+		"kills_kassen": 0,
+		"enemy_seen": [Balance.KIND_KASSEN],
 		"coins": 3,
 		"outcome": "down",
 		"character": Balance.CHAR_MASSA,
@@ -474,6 +531,9 @@ func _save() -> void:
 	var first: Dictionary = store.commit_run(summary)
 	_true(bool(first.best_updated), "first best")
 	_eq(int(first.yen), 3, "yen gained")
+	_eq(int(store.data.enemy_kills[Balance.KIND_NORMAL]), 4, "bestiary kill count")
+	_true(store.data.enemy_seen.has(Balance.KIND_KASSEN), "bestiary records encounter")
+	_eq(int(store.data.local_scores[0].score), 40, "local ranking stores run")
 	_eq(int(store.data.pending_score.score), 40, "pending score")
 	_eq(str(store.data.pending_score.display_name), "ななし", "pending blank name")
 	_eq(str(store.data.pending_score.version), "0.1.0", "pending version")
@@ -502,6 +562,8 @@ func _save() -> void:
 	_eq(str(loaded.data.player_id), player_id, "id persists")
 	_eq(int(loaded.data.best_score), 50, "best persists")
 	_eq(int(loaded.data.yen), 7, "yen persists")
+	_eq(int(loaded.data.local_scores[0].score), 50, "local ranking persists")
+	_true(loaded.data.enemy_seen.has(Balance.KIND_KASSEN), "bestiary persists")
 	_eq(str(loaded.data.costume[Balance.CHAR_MASSA]), "私服", "costume default")
 
 	var bad := "/tmp/inba_war_save_bad.json"
@@ -593,6 +655,7 @@ func _shop() -> void:
 func _kite() -> void:
 	var sim = BattleSim.new()
 	sim.rng.seed = 7
+	sim.boss_spawn_attempted = true
 	var guard := 0
 	while not sim.finished and guard < 20000:
 		guard += 1
@@ -604,7 +667,9 @@ func _kite() -> void:
 	_eq(sim.score, Balance.score_from_kills(
 		int(sim.kills_of[Balance.KIND_NORMAL]),
 		int(sim.kills_of[Balance.KIND_FAST]),
-		int(sim.kills_of[Balance.KIND_TANK])
+		int(sim.kills_of[Balance.KIND_TANK]),
+		int(sim.kills_of[Balance.KIND_NIMOTON]),
+		int(sim.kills_of[Balance.KIND_KASSEN])
 	), "kite score")
 	_true(sim.max_alive_seen <= 60, "kite cap")
 	_true(sim.player_pos.x >= sim.player_radius - 0.1, "player in field")
