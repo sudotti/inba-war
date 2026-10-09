@@ -1,0 +1,625 @@
+extends RefCounted
+class_name BattleSim
+
+const Balance = preload("res://scripts/balance.gd")
+
+class Actor extends RefCounted:
+	var id: int
+	var kind: String
+	var pos: Vector2
+	var hp: int
+	var max_hp: int
+	var speed: float
+	var touch: int
+	var radius: float
+	var stun: float
+	var knockback_scale: float
+
+
+class Coin extends RefCounted:
+	var id: int
+	var pos: Vector2
+
+
+class Cone extends RefCounted:
+	var pos: Vector2
+	var radius: float
+
+
+var character_id: String = Balance.CHAR_MASSA
+var time: float = 0.0
+var player_pos: Vector2 = Balance.START
+var player_hp: int = 100
+var player_max_hp: int = 100
+var player_radius: float = 22.0
+var base_speed: float = 155.0
+var attack_interval: float = 1.0
+var attack_radius: float = 136.0
+var _base_interval: float = 1.0
+var _base_radius: float = 136.0
+var base_attack: int = 14
+var base_knockback: float = 180.0
+var damage_taken_scale: float = 1.0
+
+var enemies: Array[Actor] = []
+var coins: Array[Coin] = []
+var cones: Array[Cone] = []
+
+var levels: Dictionary = {}
+var kills: int = 0
+var kills_of: Dictionary = {
+	Balance.KIND_NORMAL: 0,
+	Balance.KIND_FAST: 0,
+	Balance.KIND_TANK: 0,
+}
+var score: int = 0
+var coin_value: float = 0.0
+
+var finished: bool = false
+var outcome: String = ""
+var build_open: bool = false
+var current_choices: Array = []
+
+var view_rect: Rect2 = Rect2()
+var attacks_enabled: bool = true
+var contact_enabled: bool = true
+var spawns_enabled: bool = true
+var regular_spawns_enabled: bool = true
+var hurt_serial: int = 0
+var pulse_serial: int = 0
+var pulse_age: float = 10.0
+var attack_serial: int = 0
+var max_alive_seen: int = 0
+
+var rng := RandomNumberGenerator.new()
+
+var _next_id: int = 1
+var _attack_acc: float = 0.0
+var _puri_acc: float = 0.0
+var _spawn_acc: float = 0.0
+var _next_hurt: float = Balance.INVULN_SECONDS
+var _next_build_index: int = 0
+var _pending_offers: int = 0
+var _kaiju_next: float = 75.0
+
+
+func _init(who: String = Balance.CHAR_MASSA) -> void:
+	character_id = who
+	var stats: Dictionary = Balance.CHARACTERS[who]
+	player_max_hp = int(stats.max_hp)
+	player_hp = player_max_hp
+	player_radius = float(stats.radius)
+	base_speed = float(stats.speed)
+	_base_interval = float(stats.attack_interval)
+	_base_radius = float(stats.attack_radius)
+	attack_interval = _base_interval
+	attack_radius = _base_radius
+	base_attack = int(stats.attack)
+	base_knockback = float(stats.knockback)
+	damage_taken_scale = float(stats.damage_taken_scale)
+	player_pos = Balance.START
+	for id in Balance.UPGRADES:
+		levels[id] = 0
+	for point in Balance.CONE_POINTS:
+		var cone := Cone.new()
+		cone.pos = point
+		cone.radius = Balance.CONE_RADIUS
+		cones.append(cone)
+	view_rect = Rect2(player_pos - Vector2(640, 360), Vector2(1280, 720))
+	rng.randomize()
+
+
+func shown_coins() -> int:
+	return int(floor(coin_value))
+
+
+func speed_now() -> float:
+	return Balance.move_speed(base_speed, int(levels[Balance.KENKYAKU]))
+
+
+func attack_ratio() -> float:
+	if attack_interval <= 0.0:
+		return 0.0
+	return clampf(_attack_acc / attack_interval, 0.0, 1.0)
+
+
+func step(dt: float, move_dir: Vector2) -> void:
+	if finished or build_open or dt <= 0.0:
+		return
+	var left := dt
+	var guard := 0
+	while left > 0.000001 and not finished and not build_open and guard < 8000:
+		guard += 1
+		var slice := minf(0.05, left)
+		_step_slice(slice, move_dir)
+		left -= slice
+
+
+func _step_slice(dt: float, move_dir: Vector2) -> void:
+	time += dt
+	_move_player(dt, move_dir)
+	_move_enemies(dt)
+	_move_coins(dt)
+	_attacks(dt)
+	if finished:
+		return
+	_puritora(dt)
+	if finished:
+		return
+	_hurts()
+	if finished:
+		return
+	_despawn_far()
+	if _open_build_if_needed():
+		return
+	if spawns_enabled and regular_spawns_enabled:
+		_update_spawns(dt)
+	if spawns_enabled:
+		_update_kaiju()
+	if _open_build_if_needed():
+		return
+	if time >= Balance.ROUND_SECONDS and not build_open:
+		_end("clear")
+
+
+func _apply_build_stats() -> void:
+	var maai := int(levels.get(Balance.MAAI, 0))
+	var renda := int(levels.get(Balance.RENDA, 0))
+	attack_radius = _base_radius * (1.0 + 0.14 * float(maai))
+	attack_interval = maxf(0.34, _base_interval * (1.0 - 0.08 * float(renda)))
+
+
+func choose(index: int) -> void:
+	if not build_open or finished:
+		return
+	if current_choices.is_empty():
+		build_open = false
+		return
+	if index < 0 or index >= current_choices.size():
+		index = 0
+	var id: String = current_choices[index]
+	levels[id] = int(levels[id]) + 1
+	_apply_build_stats()
+	if id == Balance.ONIGIRI:
+		player_max_hp += 20
+		player_hp = mini(player_max_hp, player_hp + 20)
+	if id == Balance.PURITORA and int(levels[id]) == 1:
+		_puri_acc = 0.0
+	build_open = false
+	current_choices = []
+	if _open_build_if_needed():
+		return
+	if time >= Balance.ROUND_SECONDS:
+		_end("clear")
+
+
+func make_summary() -> Dictionary:
+	return {
+		"score": score,
+		"kills": kills,
+		"kills_normal": int(kills_of[Balance.KIND_NORMAL]),
+		"kills_fast": int(kills_of[Balance.KIND_FAST]),
+		"kills_tank": int(kills_of[Balance.KIND_TANK]),
+		"coins": shown_coins(),
+		"outcome": outcome,
+		"character": character_id,
+		"time": time,
+	}
+
+
+func debug_place(kind: String, pos: Vector2, hp: int, speed: float) -> Actor:
+	var actor := _make_actor(kind, time)
+	actor.pos = pos
+	actor.hp = hp
+	actor.max_hp = hp
+	actor.speed = speed
+	enemies.append(actor)
+	max_alive_seen = maxi(max_alive_seen, enemies.size())
+	return actor
+
+
+func debug_count_kills(kind: String, count: int) -> void:
+	for _i in count:
+		_register_kill(kind)
+	_open_build_if_needed()
+
+
+func _move_player(dt: float, move_dir: Vector2) -> void:
+	var direction := move_dir
+	if direction.length() > 1.0:
+		direction = direction.normalized()
+	player_pos = _resolve(player_pos + direction * speed_now() * dt, player_radius)
+
+
+func _move_enemies(dt: float) -> void:
+	for actor in enemies:
+		if actor.stun > 0.0:
+			actor.stun = maxf(0.0, actor.stun - dt)
+			continue
+		var toward := player_pos - actor.pos
+		if toward.length() < 0.001:
+			continue
+		actor.pos = _resolve(actor.pos + toward.normalized() * actor.speed * dt, actor.radius)
+
+
+func _move_coins(dt: float) -> void:
+	var magnet := Balance.magnet_radius(int(levels[Balance.KANE]))
+	var keep: Array[Coin] = []
+	for coin in coins:
+		var toward := player_pos - coin.pos
+		var dist := toward.length()
+		if dist <= Balance.PICKUP_RADIUS:
+			_collect_coin()
+			continue
+		if dist <= magnet and dist > 0.001:
+			var step_len := Balance.COIN_PULL_SPEED * dt
+			if step_len >= dist - Balance.PICKUP_RADIUS:
+				_collect_coin()
+				continue
+			coin.pos += toward / dist * step_len
+		keep.append(coin)
+	coins = keep
+
+
+func _collect_coin() -> void:
+	coin_value += Balance.coin_gain(1, int(levels[Balance.OKOZUKAI]))
+
+
+func _attacks(dt: float) -> void:
+	_attack_acc += dt
+	var guard := 0
+	while _attack_acc >= attack_interval and not finished and guard < 32:
+		guard += 1
+		_attack_acc -= attack_interval
+		if attacks_enabled:
+			_attack()
+
+
+func _attack() -> void:
+	attack_serial += 1
+	var damage := Balance.attack_damage(base_attack, int(levels[Balance.BUTTO]))
+	var blast := base_knockback * (1.0 + 0.15 * float(levels[Balance.BUTTO]))
+	var reached: Array[Actor] = []
+	for actor in enemies:
+		# 射程の円の中は、敵の中心までの距離。
+		if player_pos.distance_to(actor.pos) <= attack_radius:
+			reached.append(actor)
+	var dead: Array[Actor] = []
+	for actor in reached:
+		actor.hp -= damage
+		if actor.hp <= 0:
+			dead.append(actor)
+		elif actor.stun <= 0.0:
+			_knockback(actor, blast)
+	for actor in dead:
+		_kill(actor)
+
+
+func _puritora(dt: float) -> void:
+	pulse_age += dt
+	var level := int(levels[Balance.PURITORA])
+	if level <= 0:
+		return
+	_puri_acc += dt
+	var interval := Balance.puritora_interval(level)
+	var guard := 0
+	while _puri_acc >= interval and guard < 32:
+		guard += 1
+		_puri_acc -= interval
+		_pulse()
+
+
+func _pulse() -> void:
+	pulse_serial += 1
+	pulse_age = 0.0
+	var radius := Balance.puritora_radius(int(levels[Balance.PURITORA]))
+	for actor in enemies:
+		if player_pos.distance_to(actor.pos) > radius:
+			continue
+		if actor.kind == Balance.KIND_TANK:
+			actor.stun = Balance.STUN_TANK_SECONDS
+		else:
+			actor.stun = Balance.STUN_SECONDS
+
+
+func _hurts() -> void:
+	var guard := 0
+	while time >= _next_hurt and not finished and guard < 64:
+		guard += 1
+		if not contact_enabled:
+			_next_hurt += Balance.HURT_INTERVAL
+			continue
+		_contact()
+
+
+func _contact() -> void:
+	var raw := _contact_raw()
+	var dealt := Balance.apply_damage_scale(raw, damage_taken_scale)
+	_next_hurt += Balance.HURT_INTERVAL
+	if dealt <= 0:
+		return
+	hurt_serial += 1
+	player_hp -= dealt
+	if player_hp <= 0:
+		player_hp = 0
+		_pending_offers = 0
+		build_open = false
+		current_choices = []
+		_end("down")
+
+
+func _contact_raw() -> int:
+	var amounts: Array[int] = []
+	for actor in enemies:
+		if actor.stun > 0.0:
+			continue
+		var reach := player_radius + actor.radius
+		if player_pos.distance_to(actor.pos) <= reach:
+			amounts.append(actor.touch)
+	amounts.sort()
+	var total := 0
+	var n := mini(3, amounts.size())
+	for i in n:
+		total += amounts[amounts.size() - 1 - i]
+	return total
+
+
+func _despawn_far() -> void:
+	var keep: Array[Actor] = []
+	for actor in enemies:
+		if player_pos.distance_to(actor.pos) > Balance.DESPAWN_DISTANCE:
+			continue
+		keep.append(actor)
+	enemies = keep
+
+
+func _update_spawns(dt: float) -> void:
+	var t := time - dt
+	var acc := _spawn_acc
+	var spins := 0
+	while t < time and spins < 10000:
+		spins += 1
+		if t >= Balance.ROUND_SECONDS:
+			break
+		var interval: float = float(Balance.spawn_profile(t).interval)
+		if acc >= interval:
+			acc = 0.0
+			_spawn_scheduled(t)
+			continue
+		var need := interval - acc
+		var room := time - t
+		if need > room:
+			acc += room
+			t = time
+			break
+		t += need
+		acc = 0.0
+		if t <= Balance.ROUND_SECONDS:
+			_spawn_scheduled(t)
+	_spawn_acc = acc
+
+
+func _spawn_scheduled(elapsed: float) -> void:
+	if enemies.size() >= Balance.MAX_ALIVE:
+		return
+	if elapsed >= Balance.ROUND_SECONDS:
+		return
+	var roll := rng.randf()
+	var kind := Balance.kind_for_roll(elapsed, roll)
+	_spawn_kind(kind, elapsed)
+
+
+func _update_kaiju() -> void:
+	while _kaiju_next <= time and _kaiju_next <= Balance.ROUND_SECONDS:
+		var when := _kaiju_next
+		_kaiju_next += 30.0
+		if enemies.size() >= Balance.MAX_ALIVE:
+			continue
+		if _kaiju_alive():
+			continue
+		_spawn_kind(Balance.KIND_TANK, when)
+
+
+func _spawn_kind(kind: String, elapsed: float) -> bool:
+	var stats: Dictionary = Balance.ENEMIES[kind]
+	var found: Array = _find_spawn(float(stats.radius))
+	if found.is_empty():
+		return false
+	var actor := _make_actor(kind, elapsed)
+	actor.pos = found[0]
+	enemies.append(actor)
+	max_alive_seen = maxi(max_alive_seen, enemies.size())
+	return true
+
+
+func _make_actor(kind: String, elapsed: float) -> Actor:
+	var stats: Dictionary = Balance.ENEMIES[kind]
+	var actor := Actor.new()
+	actor.id = _next_id
+	_next_id += 1
+	actor.kind = kind
+	actor.speed = float(stats.speed)
+	actor.touch = int(stats.touch)
+	actor.radius = float(stats.radius)
+	actor.knockback_scale = float(stats.knockback_scale)
+	actor.stun = 0.0
+	if kind == Balance.KIND_TANK:
+		actor.max_hp = int(stats.hp)
+	else:
+		actor.max_hp = Balance.scaled_hp(int(stats.hp), elapsed)
+	actor.hp = actor.max_hp
+	return actor
+
+
+func _find_spawn(radius: float) -> Array:
+	var inner := Rect2(
+		Vector2(radius, radius),
+		Vector2(Balance.FIELD_W - radius * 2.0, Balance.FIELD_H - radius * 2.0)
+	)
+	var blocked := view_rect.grow(Balance.SPAWN_OUTSIDE_MARGIN)
+	var bands: Array[Rect2] = []
+	if blocked.position.x > inner.position.x:
+		bands.append(Rect2(inner.position.x, inner.position.y, blocked.position.x - inner.position.x, inner.size.y))
+	if blocked.end.x < inner.end.x:
+		bands.append(Rect2(blocked.end.x, inner.position.y, inner.end.x - blocked.end.x, inner.size.y))
+	if blocked.position.y > inner.position.y:
+		bands.append(Rect2(inner.position.x, inner.position.y, inner.size.x, blocked.position.y - inner.position.y))
+	if blocked.end.y < inner.end.y:
+		bands.append(Rect2(inner.position.x, blocked.end.y, inner.size.x, inner.end.y - blocked.end.y))
+	if bands.is_empty():
+		return []
+	for _i in 40:
+		var band: Rect2 = bands[rng.randi() % bands.size()]
+		if band.size.x <= 1.0 or band.size.y <= 1.0:
+			continue
+		var pos := Vector2(
+			rng.randf_range(band.position.x, band.end.x),
+			rng.randf_range(band.position.y, band.end.y)
+		)
+		if pos.distance_to(player_pos) > Balance.SPAWN_MAX_DISTANCE:
+			continue
+		if _hits_cone(pos, radius):
+			continue
+		if blocked.has_point(pos):
+			continue
+		return [pos]
+	return []
+
+
+func _kill(actor: Actor) -> void:
+	var index := enemies.find(actor)
+	if index >= 0:
+		enemies.remove_at(index)
+	_register_kill(actor.kind)
+	_drop_coins(actor)
+
+
+func _register_kill(kind: String) -> void:
+	kills += 1
+	kills_of[kind] = int(kills_of[kind]) + 1
+	score += int(Balance.SCORE[kind])
+	var megumi_level := int(levels[Balance.MEGUMI])
+	if megumi_level > 0 and kills % 10 == 0:
+		player_hp = mini(player_max_hp, player_hp + Balance.megumi_heal(megumi_level))
+	while kills >= Balance.build_threshold(_next_build_index):
+		_pending_offers += 1
+		_next_build_index += 1
+
+
+func _drop_coins(actor: Actor) -> void:
+	var chance := float(Balance.COIN_CHANCE[actor.kind])
+	if rng.randf() >= chance:
+		return
+	var count := int(Balance.COIN_COUNT[actor.kind])
+	for i in count:
+		var coin := Coin.new()
+		coin.id = _next_id
+		_next_id += 1
+		var angle := float(i) / float(count) * TAU + rng.randf() * 0.4
+		var spot := actor.pos + Vector2.from_angle(angle) * 14.0
+		spot.x = clampf(spot.x, 8.0, Balance.FIELD_W - 8.0)
+		spot.y = clampf(spot.y, 8.0, Balance.FIELD_H - 8.0)
+		coin.pos = spot
+		coins.append(coin)
+
+
+func _knockback(actor: Actor, distance: float) -> void:
+	var away := actor.pos - player_pos
+	if away.length() < 0.001:
+		away = Vector2.RIGHT
+	else:
+		away = away.normalized()
+	var left := distance * actor.knockback_scale
+	var step_len := 4.0
+	while left > 0.0:
+		var d := minf(step_len, left)
+		var nxt := actor.pos + away * d
+		# コーンと校庭の端では、滑らずに止まる。
+		if _hits_cone(nxt, actor.radius) or _out_of_field(nxt, actor.radius):
+			break
+		actor.pos = nxt
+		left -= d
+
+
+func _open_build_if_needed() -> bool:
+	if build_open:
+		return true
+	while _pending_offers > 0:
+		_pending_offers -= 1
+		var choices := _roll_choices()
+		if choices.is_empty():
+			continue
+		build_open = true
+		current_choices = choices
+		return true
+	return false
+
+
+func _roll_choices() -> Array:
+	var pool: Array = []
+	for id in Balance.UPGRADES:
+		if int(levels[id]) < Balance.UPGRADE_MAX:
+			pool.append(id)
+	for i in range(pool.size() - 1, 0, -1):
+		var j := rng.randi() % (i + 1)
+		var tmp = pool[i]
+		pool[i] = pool[j]
+		pool[j] = tmp
+	return pool.slice(0, mini(3, pool.size()))
+
+
+func _kaiju_alive() -> bool:
+	for actor in enemies:
+		if actor.kind == Balance.KIND_TANK:
+			return true
+	return false
+
+
+func _hits_cone(pos: Vector2, radius: float) -> bool:
+	for cone in cones:
+		if pos.distance_to(cone.pos) < radius + cone.radius:
+			return true
+	return false
+
+
+func _out_of_field(pos: Vector2, radius: float) -> bool:
+	return (
+		pos.x < radius
+		or pos.y < radius
+		or pos.x > Balance.FIELD_W - radius
+		or pos.y > Balance.FIELD_H - radius
+	)
+
+
+func _resolve(pos: Vector2, radius: float) -> Vector2:
+	var p := _clamp_field(pos, radius)
+	for _i in 6:
+		var hit := false
+		for cone in cones:
+			var diff := p - cone.pos
+			var min_d := radius + cone.radius
+			var dist := diff.length()
+			if dist < min_d:
+				var normal := Vector2.RIGHT if dist < 0.0001 else diff / dist
+				p = cone.pos + normal * min_d
+				hit = true
+		p = _clamp_field(p, radius)
+		if not hit:
+			break
+	return p
+
+
+func _clamp_field(pos: Vector2, radius: float) -> Vector2:
+	return Vector2(
+		clampf(pos.x, radius, Balance.FIELD_W - radius),
+		clampf(pos.y, radius, Balance.FIELD_H - radius)
+	)
+
+
+func _end(kind: String) -> void:
+	if finished:
+		return
+	finished = true
+	outcome = kind
+	build_open = false
+	current_choices = []

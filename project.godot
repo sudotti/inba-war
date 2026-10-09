@@ -1,0 +1,34 @@
+; Engine configuration file.
+; Godot 4.7.2 / 印旛村戦線 0.1.0
+
+config_version=5
+
+[application]
+
+config/name="印旛村戦線"
+config/version="0.1.0"
+run/main_scene="res://scenes/title.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[autoload]
+
+SaveStore="*res://scripts/save_store.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=4
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+anti_aliasing/quality/msaa_2d=0
+environment/defaults/default_clear_color=Color(0.435294, 0.811765, 0.270588, 1)
