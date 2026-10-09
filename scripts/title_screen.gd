@@ -45,7 +45,7 @@ func _build() -> void:
 	if _portrait:
 		_build_title_portrait()
 		_build_poster_portrait()
-		_build_stats(0.575, 0.645)
+		_build_stats(0.555, 0.665)
 		_build_menu_portrait()
 	else:
 		_build_poster_landscape()
@@ -332,8 +332,8 @@ func _build_menu_landscape() -> void:
 func _build_menu_portrait() -> void:
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_theme_constant_override("separation", 10)
-	UiFont.place(col, 0.08, 0.66, 0.92, 0.985)
+	col.add_theme_constant_override("separation", 8)
+	UiFont.place(col, 0.08, 0.685, 0.92, 0.99)
 	add_child(col)
 	for item in _menu_items():
 		var button := UiFont.royal_button(str(item[0]), 22, bool(item[1]))

@@ -51,19 +51,19 @@ func _check_layout() -> void:
 func _check_title() -> void:
 	var title := current
 	if _count_buttons(title) < 4:
-		print("TITLE landscape buttons < 4")
-		fails += 1
-	if not _has_menu(title, false):
-		print("TITLE landscape menu not horizontal")
-		fails += 1
-	_clear_children(title)
-	title._portrait = true
-	title._build()
-	if _count_buttons(title) < 4:
 		print("TITLE portrait buttons < 4")
 		fails += 1
 	if not _has_menu(title, true):
 		print("TITLE portrait menu not vertical")
+		fails += 1
+	_clear_children(title)
+	title._portrait = false
+	title._build()
+	if _count_buttons(title) < 4:
+		print("TITLE landscape buttons < 4")
+		fails += 1
+	if not _has_menu(title, false):
+		print("TITLE landscape menu not horizontal")
 		fails += 1
 
 
