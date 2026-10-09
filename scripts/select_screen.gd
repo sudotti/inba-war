@@ -24,6 +24,7 @@ var _closet_list: VBoxContainer
 var _closet_who := ""
 var _is_portrait := false
 var _main_margin: MarginContainer
+var _rebuilding := false
 
 
 func _ready() -> void:
@@ -34,13 +35,25 @@ func _ready() -> void:
 
 
 func _on_resized() -> void:
+	if _rebuilding:
+		return
 	var new_portrait = _portrait_now()
 	if new_portrait != _is_portrait:
 		_is_portrait = new_portrait
-		_build()
+		_rebuilding = true
+		call_deferred("_rebuild")
+
+
+func _rebuild() -> void:
+	_build()
+	_rebuilding = false
 
 
 func _portrait_now() -> bool:
+	# Use window size instead of viewport rect (stretch mode affects viewport)
+	if DisplayServer.has_feature("window_get_size"):
+		var win_size := DisplayServer.window_get_size()
+		return win_size.y > win_size.x
 	return UiFont.portrait(get_viewport().get_visible_rect().size)
 
 
