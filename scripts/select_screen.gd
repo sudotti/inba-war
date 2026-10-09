@@ -184,22 +184,13 @@ func _add_card_actions(target: Control, who: String) -> void:
 
 func _costume_button() -> Button:
 	var node := UiFont.button("", 20)
-	node.custom_minimum_size = Vector2(0, 48)
-	var inner := HBoxContainer.new()
-	inner.alignment = BoxContainer.ALIGNMENT_CENTER
-	inner.add_theme_constant_override("separation", 6)
-	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(inner)
-	node.add_child(inner)
+	node.custom_minimum_size = Vector2(48, 48)
 	var icon := CostumeIcon.new()
-	icon.custom_minimum_size = Vector2(22, 22)
+	icon.custom_minimum_size = Vector2(28, 28)
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	inner.add_child(icon)
-	var caption := UiFont.label("衣装", 20, UiFont.INK)
-	caption.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	inner.add_child(caption)
+	node.add_child(icon)
 	return node
 
 
