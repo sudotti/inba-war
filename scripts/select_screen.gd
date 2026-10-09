@@ -26,6 +26,7 @@ var _is_portrait := false
 var _main_margin: MarginContainer
 var _main_container: Control
 var _timer := 0.0
+var _rebuild_pending := false
 
 
 func _ready() -> void:
@@ -61,21 +62,22 @@ func _process(delta: float) -> void:
 	if _timer > 0.0:
 		return
 	var p := _portrait_now()
-	if p != _is_portrait:
+	if p != _is_portrait and not _rebuild_pending:
 		_is_portrait = p
-		_timer = 0.5  # Debounce: ignore orientation changes for 0.5s
-		_refill()
+		_timer = 0.5
+		_rebuild_pending = true
+		call_deferred("_do_refill")
 
 
-func _refill() -> void:
+func _do_refill() -> void:
 	# Clear only the children of the fixed container
 	for child in _main_container.get_children():
 		_main_container.remove_child(child)
 		child.queue_free()
 	# Reapply safe area padding for new orientation
 	SafeArea.apply_safe_padding(_main_margin, get_viewport())
-	# Use call_deferred to avoid issues with await in debug mode
-	call_deferred("_fill")
+	_fill()
+	_rebuild_pending = false
 
 
 func _portrait_now() -> bool:
