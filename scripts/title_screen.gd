@@ -2,14 +2,14 @@ extends Control
 
 const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
+const SafeArea = preload("res://scripts/safe_area.gd")
 
 const HERO := "res://assets/portraits/masaki.png"
-const W := 390
-const H := 844
 
 var _name_panel: Control
 var _name_edit: LineEdit
 var _name_hint: Label
+var _main_margin: MarginContainer
 
 
 func _ready() -> void:
@@ -29,72 +29,123 @@ func _build() -> void:
 	_name_panel = null
 	_name_edit = null
 	_name_hint = null
+	_main_margin = null
 
 	_build_background()
-	_build_top_bar()
-	_build_hero()
-	_build_main_button()
-	_build_sub_menu()
-	_build_version()
+	_build_content()
 
 
 func _build_background() -> void:
 	var bg := ColorRect.new()
 	bg.color = Color(0.02, 0.02, 0.04, 1.0)
-	_set_full_rect(bg)
+	bg.anchors_preset = Control.PRESET_FULL_RECT
 	add_child(bg)
 
 
-func _build_top_bar() -> void:
-	var bar := HBoxContainer.new()
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_set_anchors(bar, 0, 16, W, 52)
-	add_child(bar)
+func _build_content() -> void:
+	_main_margin = MarginContainer.new()
+	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
+	SafeArea.apply_safe_padding(_main_margin, get_viewport())
+	add_child(_main_margin)
 
-	var left := Control.new()
-	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.add_child(left)
+	var root := VBoxContainer.new()
+	root.alignment = BoxContainer.ALIGNMENT_CENTER
+	root.add_theme_constant_override("separation", 12)
+	_main_margin.add_child(root)
 
-	var name_pill := _make_pill(SaveStore.shown_name(), 160)
-	name_pill.anchor_left = 0.5
-	name_pill.anchor_top = 0.5
-	name_pill.anchor_right = 0.5
-	name_pill.anchor_bottom = 0.5
-	name_pill.offset_left = -80
-	name_pill.offset_top = -18
-	name_pill.offset_right = 80
-	name_pill.offset_bottom = 18
-	left.add_child(name_pill)
+	# Top bar
+	var top_bar := HBoxContainer.new()
+	top_bar.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_bar.add_theme_constant_override("separation", 12)
+	top_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(top_bar)
 
-	var right := Control.new()
-	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.add_child(right)
+	# Left: player name
+	var name_pill := _make_pill(SaveStore.shown_name())
+	name_pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	top_bar.add_child(name_pill)
 
-	var yen_pill := _make_pill("💰 " + str(int(SaveStore.data.get("yen", 0))) + "円", 160)
-	yen_pill.anchor_left = 0.5
-	yen_pill.anchor_top = 0.5
-	yen_pill.anchor_right = 0.5
-	yen_pill.anchor_bottom = 0.5
-	yen_pill.offset_left = -80
-	yen_pill.offset_top = -18
-	yen_pill.offset_right = 80
-	yen_pill.offset_bottom = 18
-	right.add_child(yen_pill)
+	# Spacer
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_bar.add_child(spacer)
+
+	# Right: yen
+	var yen_pill := _make_pill("💰 " + str(int(SaveStore.data.get("yen", 0))) + "円")
+	yen_pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	top_bar.add_child(yen_pill)
+
+	# Hero area - expands to fill
+	var hero_frame := Control.new()
+	hero_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hero_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(hero_frame)
+
+	var hero_texture := load(HERO)
+	var hero_image := TextureRect.new()
+	hero_image.texture = hero_texture
+	hero_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hero_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	hero_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero_image.anchors_preset = Control.PRESET_FULL_RECT
+	hero_frame.add_child(hero_image)
+
+	# Gradient fade at bottom
+	var grad := Gradient.new()
+	grad.add_point(0.0, Color(0, 0, 0, 0.0))
+	grad.add_point(0.55, Color(0, 0, 0, 0.0))
+	grad.add_point(0.75, Color(0, 0, 0, 0.25))
+	grad.add_point(1.0, Color(0, 0, 0, 0.95))
+	var grad_tex := GradientTexture1D.new()
+	grad_tex.gradient = grad
+	grad_tex.width = 512
+	var fade := TextureRect.new()
+	fade.texture = grad_tex
+	fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	fade.stretch_mode = TextureRect.STRETCH_SCALE
+	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fade.anchors_preset = Control.PRESET_FULL_RECT
+	hero_frame.add_child(fade)
+
+	# Main sortie button
+	var main_btn := _make_main_button()
+	main_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_btn.custom_minimum_size = Vector2(0, 56)
+	root.add_child(main_btn)
+
+	# Sub menu grid
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(grid)
+
+	var items = [
+		["ランキング", "🏆", _open_ranking],
+		["敵図鑑", "📖", _open_bestiary],
+		["なかむら商店", "🏪", _open_shop],
+		["設定", "⚙", _open_settings],
+	]
+	for item in items:
+		var btn := _make_sub_button(item[0], item[1], item[2])
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.custom_minimum_size = Vector2(0, 56)
+		grid.add_child(btn)
 
 
-func _make_pill(text: String, width: float) -> Panel:
+func _make_pill(text: String) -> Panel:
 	var panel := Panel.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0, 0, 0, 0.55)
 	style.border_color = UiFont.GOLD
 	style.set_border_width_all(1.5)
 	style.set_corner_radius_all(16)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 6
-	style.content_margin_bottom = 6
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
 	panel.add_theme_stylebox_override("panel", style)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -109,65 +160,9 @@ func _make_pill(text: String, width: float) -> Panel:
 	return panel
 
 
-func _set_full_rect(node: Control) -> void:
-	node.anchor_left = 0.0
-	node.anchor_top = 0.0
-	node.anchor_right = 1.0
-	node.anchor_bottom = 1.0
-	node.offset_left = 0
-	node.offset_top = 0
-	node.offset_right = 0
-	node.offset_bottom = 0
-
-
-func _set_anchors(node: Control, left: float, top: float, right: float, bottom: float) -> void:
-	node.anchor_left = left / W
-	node.anchor_top = top / H
-	node.anchor_right = right / W
-	node.anchor_bottom = bottom / H
-	node.offset_left = 0
-	node.offset_top = 0
-	node.offset_right = 0
-	node.offset_bottom = 0
-
-
-func _build_hero() -> void:
-	var hero_frame := Control.new()
-	hero_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_set_anchors(hero_frame, 0, 64, W, 500)
-	add_child(hero_frame)
-
-	var hero_texture := load(HERO)
-	var hero_image := TextureRect.new()
-	hero_image.texture = hero_texture
-	hero_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	hero_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	hero_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_set_full_rect(hero_image)
-	hero_frame.add_child(hero_image)
-
-	var grad := Gradient.new()
-	grad.add_point(0.0, Color(0, 0, 0, 0.0))
-	grad.add_point(0.55, Color(0, 0, 0, 0.0))
-	grad.add_point(0.75, Color(0, 0, 0, 0.25))
-	grad.add_point(1.0, Color(0, 0, 0, 0.95))
-	var grad_tex := GradientTexture1D.new()
-	grad_tex.gradient = grad
-	grad_tex.width = 512
-	var fade := TextureRect.new()
-	fade.texture = grad_tex
-	fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	fade.stretch_mode = TextureRect.STRETCH_SCALE
-	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_set_full_rect(fade)
-	hero_frame.add_child(fade)
-
-
-func _build_main_button() -> void:
+func _make_main_button() -> Button:
 	var btn := Button.new()
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_set_anchors(btn, 20, 520, 370, 604)
-	add_child(btn)
 
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.12, 0.09, 0.04, 0.95)
@@ -200,18 +195,18 @@ func _build_main_button() -> void:
 	container.alignment = BoxContainer.ALIGNMENT_CENTER
 	container.add_theme_constant_override("separation", 10)
 	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_set_full_rect(container)
+	container.anchors_preset = Control.PRESET_FULL_RECT
 	btn.add_child(container)
 
 	var icon := Label.new()
 	icon.text = "⚔"
 	icon.add_theme_font_override("font", UiFont.font())
-	icon.add_theme_font_size_override("font_size", 32)
+	icon.add_theme_font_size_override("font_size", 28)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	container.add_child(icon)
 
-	var label := UiFont.label("出撃", 28, UiFont.PAPER)
+	var label := UiFont.label("出撃", 24, UiFont.PAPER)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -219,29 +214,7 @@ func _build_main_button() -> void:
 	container.add_child(label)
 
 	btn.pressed.connect(_start)
-
-
-func _build_sub_menu() -> void:
-	var items = [
-		["ランキング", "🏆", _open_ranking],
-		["敵図鑑", "📖", _open_bestiary],
-		["なかむら商店", "🏪", _open_shop],
-		["設定", "⚙", _open_settings],
-	]
-
-	var positions = [
-		Vector2(20, 620),
-		Vector2(203, 620),
-		Vector2(20, 708),
-		Vector2(203, 708),
-	]
-
-	for i in items.size():
-		var item = items[i]
-		var pos = positions[i]
-		var btn := _make_sub_button(item[0], item[1], item[2])
-		_set_anchors(btn, pos.x, pos.y, pos.x + 167, pos.y + 72)
-		add_child(btn)
+	return btn
 
 
 func _make_sub_button(label: String, icon: String, callback: Callable) -> Button:
@@ -279,7 +252,7 @@ func _make_sub_button(label: String, icon: String, callback: Callable) -> Button
 	container.alignment = BoxContainer.ALIGNMENT_CENTER
 	container.add_theme_constant_override("separation", 8)
 	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_set_full_rect(container)
+	container.anchors_preset = Control.PRESET_FULL_RECT
 	btn.add_child(container)
 
 	var icon_label := Label.new()
@@ -300,14 +273,6 @@ func _make_sub_button(label: String, icon: String, callback: Callable) -> Button
 
 	btn.pressed.connect(callback)
 	return btn
-
-
-func _open_settings() -> void:
-	pass
-
-
-func _build_version() -> void:
-	pass
 
 
 func _name_button() -> Button:
@@ -335,28 +300,33 @@ func _open_name_entry() -> void:
 		return
 	var overlay := Control.new()
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_set_full_rect(overlay)
+	overlay.anchors_preset = Control.PRESET_FULL_RECT
 	add_child(overlay)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.66)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	_set_full_rect(dim)
+	dim.anchors_preset = Control.PRESET_FULL_RECT
 	overlay.add_child(dim)
-	var panel := _make_pill("", 300)
+	var panel := PanelContainer.new()
 	panel.anchor_left = 0.5
 	panel.anchor_top = 0.5
 	panel.anchor_right = 0.5
 	panel.anchor_bottom = 0.5
-	panel.offset_left = -150
-	panel.offset_top = -120
-	panel.offset_right = 150
-	panel.offset_bottom = 120
+	panel.offset_left = -160
+	panel.offset_top = -140
+	panel.offset_right = 160
+	panel.offset_bottom = 140
+	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.12, 0.1, 0.08, 0.95), UiFont.GOLD, 2, 16))
 	overlay.add_child(panel)
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 14)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_set_full_rect(col)
+	col.anchors_preset = Control.PRESET_FULL_RECT
+	col.add_theme_constant_override("margin_left", 24)
+	col.add_theme_constant_override("margin_right", 24)
+	col.add_theme_constant_override("margin_top", 20)
+	col.add_theme_constant_override("margin_bottom", 20)
 	panel.add_child(col)
 	var heading := UiFont.label("名前を決めてね", 26, UiFont.GOLD)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -430,3 +400,7 @@ func _open_ranking() -> void:
 
 func _open_bestiary() -> void:
 	get_tree().change_scene_to_file("res://scenes/bestiary.tscn")
+
+
+func _open_settings() -> void:
+	pass
