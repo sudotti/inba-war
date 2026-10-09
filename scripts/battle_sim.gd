@@ -42,6 +42,7 @@ var base_knockback: float = 180.0
 var damage_taken_scale: float = 1.0
 var special_charge: float = 0.0
 var special_active_left: float = 0.0
+var special_motion_left: float = 0.0
 var special_serial: int = 0
 var special_pending: bool = false
 
@@ -167,6 +168,7 @@ func resolve_special() -> bool:
 	if not special_pending or finished:
 		return false
 	special_pending = false
+	special_motion_left = Balance.special_motion_seconds(character_id)
 	if character_id == Balance.CHAR_MASSA:
 		_special_sweep()
 	elif character_id == Balance.CHAR_TAKETCHI:
@@ -201,6 +203,7 @@ func _step_slice(dt: float, move_dir: Vector2) -> void:
 	_move_coins(dt)
 	_attacks(dt)
 	special_active_left = maxf(0.0, special_active_left - dt)
+	special_motion_left = maxf(0.0, special_motion_left - dt)
 	if finished:
 		return
 	_puritora(dt)
@@ -625,6 +628,8 @@ func _knockback(actor: Actor, distance: float) -> void:
 func _open_build_if_needed() -> bool:
 	if build_open:
 		return true
+	if special_motion_left > 0.0:
+		return false
 	while _pending_offers > 0:
 		_pending_offers -= 1
 		var choices := _roll_choices()

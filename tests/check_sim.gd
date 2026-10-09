@@ -117,6 +117,21 @@ func _specials() -> void:
 	_true(target.pos.distance_to(sim.player_pos) > 300.0, "massa special knockback")
 	_eq(sim.special_charge, 0.0, "special consumes charge")
 	_true(not sim.resolve_special(), "special resolves only once")
+	_true(sim.special_motion_left > 0.0, "special motion starts")
+
+	var build_sim = BattleSim.new()
+	build_sim.spawns_enabled = false
+	build_sim.contact_enabled = false
+	for i in 6:
+		build_sim.debug_place(Balance.KIND_NORMAL, build_sim.player_pos + Vector2(80.0 + float(i) * 24.0, 0.0), 1, 0.0)
+	build_sim.special_charge = Balance.SPECIAL_GAUGE_MAX
+	_true(build_sim.begin_special(), "build delay special begins")
+	_true(build_sim.resolve_special(), "build delay special resolves")
+	_true(not build_sim.build_open, "kill build waits during special motion")
+	build_sim.step(0.5, Vector2.ZERO)
+	_true(not build_sim.build_open, "kill build remains queued during motion")
+	build_sim.step(Balance.SPECIAL_MASSA_MOTION_SECONDS, Vector2.ZERO)
+	_true(build_sim.build_open, "kill build opens after special motion")
 
 	sim = BattleSim.new()
 	for _i in 20:

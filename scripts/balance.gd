@@ -21,9 +21,12 @@ const SPECIAL_KENNY_SECONDS := 6.0
 const SPECIAL_MASSA_RADIUS := 420.0
 const SPECIAL_MASSA_DAMAGE_SCALE := 3.0
 const SPECIAL_MASSA_KNOCKBACK := 480.0
+const SPECIAL_MASSA_MOTION_SECONDS := 1.25
 const SPECIAL_TAKETCHI_DAMAGE_SCALE := 1.8
 const SPECIAL_TAKETCHI_ATTACK_SCALE := 0.5
+const SPECIAL_TAKETCHI_MOTION_SECONDS := 0.95
 const SPECIAL_KENNY_ATTACK_INTERVAL := 0.12
+const SPECIAL_KENNY_MOTION_SECONDS := 0.85
 
 const SPECIAL_QUOTES := {
 	CHAR_MASSA: "印旛の未来は僕が守るっ！",
@@ -254,6 +257,14 @@ static func megumi_heal(level: int) -> int:
 
 static func apply_damage_scale(raw: int, scale: float) -> int:
 	return floori(float(raw) * scale)
+
+
+static func special_motion_seconds(who: String) -> float:
+	if who == CHAR_TAKETCHI:
+		return SPECIAL_TAKETCHI_MOTION_SECONDS
+	if who == CHAR_KENNY:
+		return SPECIAL_KENNY_MOTION_SECONDS
+	return SPECIAL_MASSA_MOTION_SECONDS
 
 
 static func score_from_kills(normal: int, fast: int, tank: int) -> int:

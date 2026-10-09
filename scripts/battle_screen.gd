@@ -77,9 +77,9 @@ var _special_face: TextureRect
 var _special_name: Label
 var _special_quote: Label
 var _special_ring_left := 0.0
-var _special_motion_left := 0.0
-var _special_motion_duration := 0.0
 var _special_tween: Tween
+var _special_flash: ColorRect
+var _special_flash_tween: Tween
 
 
 func _ready() -> void:
@@ -102,7 +102,6 @@ func _ready() -> void:
 
 func _process(dt: float) -> void:
 	_special_ring_left = maxf(0.0, _special_ring_left - dt)
-	_special_motion_left = maxf(0.0, _special_motion_left - dt)
 	if sim.finished:
 		_go_result()
 		return
@@ -281,11 +280,11 @@ func _draw() -> void:
 	_draw_ground()
 	_draw_special_aura()
 	if _special_ring_left > 0.0:
-		var progress := 1.0 - _special_ring_left / 0.58
+		var progress := 1.0 - _special_ring_left / Balance.SPECIAL_MASSA_MOTION_SECONDS
 		var start := -PI * 0.5 + progress * TAU
 		var radius := lerpf(84.0, Balance.SPECIAL_MASSA_RADIUS, progress)
-		draw_arc(sim.player_pos, radius, start, start + TAU * 0.82, 96, Color(1.0, 0.84, 0.3, 0.9 * (1.0 - progress * 0.45)), 14.0, true)
-		draw_arc(sim.player_pos, radius - 12.0, start, start + TAU * 0.72, 80, Color(1.0, 0.97, 0.78, 0.7 * (1.0 - progress)), 4.0, true)
+		draw_arc(sim.player_pos, radius, start, start + TAU * 0.96, 112, Color(1.0, 0.84, 0.3, 0.94 * (1.0 - progress * 0.38)), 20.0, true)
+		draw_arc(sim.player_pos, radius - 18.0, start + 0.7, start + TAU * 0.78, 96, Color(1.0, 0.97, 0.78, 0.78 * (1.0 - progress)), 7.0, true)
 	var shadow_r := 32.0 if str(sim.character_id) == Balance.CHAR_TAKETCHI else 24.0
 	_draw_shadow(sim.player_pos, shadow_r * (1.0 if _strike_age > 0.2 else 0.82))
 	for cone in sim.cones:
@@ -407,29 +406,30 @@ func _player_visual() -> Dictionary:
 		hop = lift * float(body.bob)
 		var side := 1.0 if idx % 2 == 0 else -1.0
 		sway = lift * float(body.sway) * side
-	if _special_motion_left > 0.0:
-		var progress := 1.0 - _special_motion_left / _special_motion_duration
+	if sim.special_motion_left > 0.0:
+		var motion_duration := Balance.special_motion_seconds(_who)
+		var progress := 1.0 - sim.special_motion_left / motion_duration
 		var aim := _aim.normalized() if _aim.length() > 0.01 else Vector2.RIGHT
 		frame = "hit"
 		hop = 0.0
 		sway = 0.0
 		if _who == Balance.CHAR_MASSA:
-			rot = TAU * 1.5 * progress
-			hop = sin(progress * PI) * 15.0
-			sx = 1.0 + sin(progress * PI) * 0.12
-			sy = 1.0 - sin(progress * PI) * 0.08
+			rot = TAU * 2.0 * progress
+			hop = sin(progress * PI) * 24.0
+			sx = 1.0 + sin(progress * PI) * 0.2
+			sy = 1.0 - sin(progress * PI) * 0.14
 		elif _who == Balance.CHAR_TAKETCHI:
 			var strike := sin(progress * PI)
-			rot = -0.08 + strike * 0.14
-			lunge = aim * (18.0 + strike * 58.0)
-			sx = 1.0 + strike * 0.09
-			sy = 1.0 - strike * 0.1
+			rot = -0.16 + strike * 0.25
+			lunge = aim * (8.0 + strike * 108.0)
+			sx = 1.0 + strike * 0.16
+			sy = 1.0 - strike * 0.13
 		else:
-			var beat := _anim * 30.0
+			var beat := _anim * 42.0
 			frame = "hit" if int(floor(beat)) % 2 == 0 else "wind"
 			var kick := maxf(sin(beat * 0.5), 0.0)
-			lunge = aim * (14.0 + kick * 54.0)
-			rot = sin(beat) * 0.11
+			lunge = aim * (14.0 + kick * 76.0)
+			rot = sin(beat) * 0.16
 	var tint := Color.WHITE
 	if _hurt_left > 0.0:
 		tint = Color(1, 0.5, 0.46)
@@ -440,6 +440,27 @@ func _player_visual() -> Dictionary:
 
 
 func _draw_special_aura() -> void:
+	if sim.special_motion_left > 0.0:
+		var progress := 1.0 - sim.special_motion_left / Balance.special_motion_seconds(_who)
+		var aim := _aim.normalized() if _aim.length() > 0.01 else Vector2.RIGHT
+		if _who == Balance.CHAR_MASSA:
+			for i in 3:
+				var angle := _anim * 18.0 + float(i) * TAU / 3.0
+				var radius := 86.0 + float(i) * 28.0 + progress * 116.0
+				draw_arc(sim.player_pos, radius, angle, angle + PI * 0.82, 48, Color(1.0, 0.78 + float(i) * 0.06, 0.35, 0.9 - progress * 0.42), 13.0 - float(i) * 2.0, true)
+		elif _who == Balance.CHAR_TAKETCHI:
+			var radius := 48.0 + progress * 260.0
+			draw_arc(sim.player_pos, radius, -0.25, TAU * 0.78, 72, Color(1.0, 0.72, 0.2, 0.8 * (1.0 - progress * 0.4)), 12.0, true)
+			for i in 4:
+				var offset := (float(i) - 1.5) * 15.0
+				var side := aim.orthogonal() * offset
+				draw_line(sim.player_pos + side + aim * 30.0, sim.player_pos + side + aim * (130.0 + progress * 180.0), Color(1.0, 0.91, 0.62, 0.75), 7.0 - float(i), true)
+		else:
+			var beat := _anim * 42.0
+			for i in 6:
+				var angle := beat * 0.62 + float(i) * TAU / 6.0
+				var direction := aim.rotated(angle) * (55.0 + fposmod(float(i) * 37.0, 72.0))
+				draw_line(sim.player_pos + direction, sim.player_pos + direction + direction.normalized() * 76.0, Color(0.55, 0.9, 1.0, 0.8), 5.0, true)
 	if _who == Balance.CHAR_TAKETCHI and sim.special_active_left > 0.0:
 		var pulse := 0.5 + 0.5 * sin(_anim * 12.0)
 		draw_arc(sim.player_pos, 54.0 + pulse * 10.0, 0.0, TAU, 56, Color(1.0, 0.72, 0.2, 0.48 + pulse * 0.2), 5.0, true)
@@ -449,15 +470,15 @@ func _draw_special_aura() -> void:
 			draw_line(sim.player_pos + direction * 66.0, sim.player_pos + direction * (78.0 + pulse * 12.0), Color(1.0, 0.9, 0.56, 0.62), 3.0, true)
 	if _who == Balance.CHAR_KENNY and sim.special_active_left > 0.0:
 		var tex: Texture2D = _frames["hit"]
-		for i in range(3, 0, -1):
-			var alpha := 0.22 - float(i) * 0.045
+		for i in range(5, 0, -1):
+			var alpha := 0.3 - float(i) * 0.045
 			var pose := {
 				"hop": 0.0,
 				"rot": 0.0,
 				"sx": _player_face,
 				"sy": 1.0,
 				"tint": Color(0.44, 0.86, 1.0, alpha),
-				"lunge": -_aim.normalized() * float(i) * 24.0,
+				"lunge": -_aim.normalized() * float(i) * 32.0 + Vector2(0.0, sin(_anim * 24.0 - float(i)) * 10.0),
 				"flash": 0.0,
 			}
 			_draw_posed(tex, sim.player_pos + Vector2(0, -4), _sprite_h(), 480.0, pose)
@@ -619,7 +640,12 @@ func _draw_puff(puff: Dictionary) -> void:
 	var fade := clampf(life / max_life, 0.0, 1.0)
 	var col: Color = puff.color
 	col.a = fade
-	draw_circle(Vector2(puff.pos), 3.0 + (1.0 - fade) * 7.0, col)
+	var radius := float(puff.get("size", 3.0)) * (0.65 + (1.0 - fade) * 0.65)
+	var spot := Vector2(puff.pos)
+	var velocity: Vector2 = puff.vel
+	if velocity.length() > 1.0:
+		draw_line(spot, spot - velocity.normalized() * radius * 3.0, col, maxf(2.0, radius * 0.8), true)
+	draw_circle(spot, radius, col)
 
 
 func _draw_stun_marks(head: Vector2, salt: int) -> void:
@@ -966,6 +992,15 @@ func _build_special_cut_in() -> void:
 	UiFont.place(band, 0.035, 0.31, 0.965, 0.69)
 	band.add_theme_stylebox_override("panel", UiFont.style(Color("17130f"), Color("e6bd62"), 5, 4))
 	_special_cut_in.add_child(band)
+	var flash_layer := CanvasLayer.new()
+	flash_layer.layer = 17
+	add_child(flash_layer)
+	_special_flash = ColorRect.new()
+	_special_flash.color = Color.WHITE
+	_special_flash.modulate.a = 0.0
+	_special_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(_special_flash)
+	flash_layer.add_child(_special_flash)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 24)
 	band.add_child(row)
@@ -1016,18 +1051,42 @@ func _activate_special() -> void:
 func _resolve_special() -> void:
 	if not sim.resolve_special():
 		return
+	var motion_duration := Balance.special_motion_seconds(_who)
+	var primary := Color("f4c45a")
 	if _who == Balance.CHAR_MASSA:
-		_special_motion_duration = 0.82
-		_special_ring_left = _special_motion_duration
-		_shake_left = 0.34
+		_special_ring_left = motion_duration
+		_shake_left = 0.46
+		_special_burst(Color("fff0a8"), Color("f08a36"), 48, 160.0, 520.0)
 	elif _who == Balance.CHAR_TAKETCHI:
-		_special_motion_duration = 0.72
-		_shake_left = 0.2
+		primary = Color("ffd15a")
+		_shake_left = 0.34
+		_special_burst(Color("fff1a8"), Color("e77a32"), 36, 90.0, 360.0)
 	else:
-		_special_motion_duration = 0.68
-	_special_motion_left = _special_motion_duration
+		primary = Color("68dcff")
+		_shake_left = 0.18
+		_special_burst(Color("e4faff"), Color("58cfff"), 42, 120.0, 460.0)
+	_special_flash.color = primary
+	_special_flash.modulate.a = 0.42
+	if _special_flash_tween != null and _special_flash_tween.is_running():
+		_special_flash_tween.kill()
+	_special_flash_tween = create_tween()
+	_special_flash_tween.tween_property(_special_flash, "modulate:a", 0.0, 0.18)
 	_update_special_hud()
 	queue_redraw()
+
+
+func _special_burst(near_color: Color, far_color: Color, count: int, min_speed: float, max_speed: float) -> void:
+	for i in count:
+		var angle := float(i) / float(count) * TAU + randf_range(-0.08, 0.08)
+		var life := randf_range(0.34, 0.72)
+		_puffs.append({
+			"pos": sim.player_pos + Vector2(0.0, -28.0),
+			"vel": Vector2.from_angle(angle) * randf_range(min_speed, max_speed),
+			"life": life,
+			"max": life,
+			"color": near_color.lerp(far_color, randf()),
+			"size": randf_range(4.0, 10.0),
+		})
 
 
 func _update_special_hud() -> void:
