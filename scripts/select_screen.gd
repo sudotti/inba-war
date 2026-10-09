@@ -27,17 +27,21 @@ var _main_margin: MarginContainer
 
 
 func _ready() -> void:
-	_is_portrait = UiFont.portrait(get_viewport_rect().size)
+	_is_portrait = _portrait_now()
 	get_viewport().size_changed.connect(_on_resized)
 	_build()
 	_build_closet()
 
 
 func _on_resized() -> void:
-	var new_portrait = UiFont.portrait(get_viewport_rect().size)
+	var new_portrait = _portrait_now()
 	if new_portrait != _is_portrait:
 		_is_portrait = new_portrait
 		_build()
+
+
+func _portrait_now() -> bool:
+	return UiFont.portrait(get_viewport().get_visible_rect().size)
 
 
 func _build() -> void:
@@ -74,7 +78,7 @@ func _build() -> void:
 	# Character list
 	if _is_portrait:
 		var scroll := ScrollContainer.new()
-		scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -82,21 +86,21 @@ func _build() -> void:
 		root.add_child(scroll)
 
 		var content := VBoxContainer.new()
-		content.alignment = BoxContainer.ALIGNMENT_CENTER
 		content.add_theme_constant_override("separation", 12)
-		content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		scroll.add_child(content)
+		scroll.resized.connect(func() -> void:
+			content.custom_minimum_size.x = scroll.size.x
+		)
+		content.custom_minimum_size.x = 360
 
 		for who in ORDER:
 			var card = _card(who)
 			card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			content.add_child(card)
 
 		var spacer := Control.new()
-		spacer.custom_minimum_size = Vector2(0, 100)
+		spacer.custom_minimum_size = Vector2(0, 24)
 		content.add_child(spacer)
 	else:
 		var center := CenterContainer.new()
@@ -130,7 +134,7 @@ func _card(who: String) -> Control:
 	var playable := SaveStore.is_playable(who)
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.custom_minimum_size = Vector2(300, 0)
+	panel.custom_minimum_size = Vector2(0, 0)
 	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.2, 0.16, 0.12, 0.95), UiFont.glass_border(1.0), 2, 16))
 
 	var margin := MarginContainer.new()
@@ -142,31 +146,25 @@ func _card(who: String) -> Control:
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	margin.add_child(col)
 
-	if _is_portrait:
-		var picture := _portrait_picture(who)
-		col.add_child(picture)
-	else:
-		var picture := TextureRect.new()
-		picture.texture = _portrait(who)
-		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		picture.custom_minimum_size = Vector2(0, 150)
-		picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		picture.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		col.add_child(picture)
-		_pictures[who] = picture
+	var picture := TextureRect.new()
+	picture.texture = _portrait(who)
+	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	picture.custom_minimum_size = Vector2(160, 220)
+	picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(picture)
+	_pictures[who] = picture
 
 	_add_card_text(col, who)
 	_add_card_special(col, who)
 
 	var actions := VBoxContainer.new()
 	actions.add_theme_constant_override("separation", 8)
-	actions.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(actions)
-
 	_add_card_actions(actions, who)
 	return panel
 
@@ -181,19 +179,6 @@ func _add_card_special(target: Control, who: String) -> void:
 	quote.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	quote.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	target.add_child(quote)
-
-
-func _portrait_picture(who: String) -> TextureRect:
-	var picture := TextureRect.new()
-	picture.texture = _portrait(who)
-	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	picture.custom_minimum_size = Vector2(0, 200)
-	picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	picture.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_pictures[who] = picture
-	return picture
 
 
 func _add_card_text(target: Control, who: String) -> void:
