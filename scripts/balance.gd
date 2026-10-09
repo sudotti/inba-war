@@ -6,9 +6,9 @@ class_name Balance
 const VERSION := "0.1.0"
 const TITLE := "印旛村戦線"
 
-const FIELD_W := 2400.0
-const FIELD_H := 1600.0
-const START := Vector2(1200, 800)
+const FIELD_W := 1600.0
+const FIELD_H := 1100.0
+const START := Vector2(800, 550)
 
 const ROUND_SECONDS := 180.0
 const BUILD_SELECT_SECONDS := 20.0
@@ -35,8 +35,8 @@ const SPECIAL_QUOTES := {
 }
 
 const MAX_ALIVE := 60
-const DESPAWN_DISTANCE := 900.0
-const SPAWN_MAX_DISTANCE := 860.0
+const DESPAWN_DISTANCE := 860.0
+const SPAWN_MAX_DISTANCE := 800.0
 const SPAWN_OUTSIDE_MARGIN := 28.0
 
 const PICKUP_RADIUS := 28.0
@@ -157,35 +157,35 @@ const CHARACTERS := {
 const ENEMIES := {
 	KIND_NORMAL: {
 		"hp": 12,
-		"speed": 80.0,
+		"speed": 120.0,
 		"touch": 6,
 		"radius": 16.0,
 		"knockback_scale": 1.0,
 	},
 	KIND_FAST: {
 		"hp": 32,
-		"speed": 175.0,
+		"speed": 220.0,
 		"touch": 10,
 		"radius": 20.0,
 		"knockback_scale": 1.0,
 	},
 	KIND_TANK: {
 		"hp": 200,
-		"speed": 55.0,
+		"speed": 85.0,
 		"touch": 16,
 		"radius": 48.0,
 		"knockback_scale": 0.35,
 	},
 	KIND_NIMOTON: {
 		"hp": 1280,
-		"speed": 86.0,
+		"speed": 115.0,
 		"touch": 32,
 		"radius": 62.0,
 		"knockback_scale": 0.08,
 	},
 	KIND_KASSEN: {
 		"hp": 1040,
-		"speed": 108.0,
+		"speed": 140.0,
 		"touch": 38,
 		"radius": 54.0,
 		"knockback_scale": 0.12,
@@ -225,33 +225,34 @@ const KIND_LABEL := {
 }
 
 const UPGRADE_NAME := {
-	BUTTO: "豪打",
-	ONIGIRI: "特製おにぎり",
-	KENKYAKU: "健脚",
-	KANE: "銭の引力",
-	PURITORA: "プリクラ衝撃波",
-	MEGUMI: "沼の恵み",
-	OKOZUKAI: "臨時収入",
+	BUTTO: "ぶっ飛ばすよ?",
+	ONIGIRI: "ばあちゃんのおにぎり",
+	KENKYAKU: "田舎の健脚",
+	KANE: "金欲しくね",
+	PURITORA: "プリとらね?",
+	MEGUMI: "印旛沼の恵み",
+	OKOZUKAI: "お小遣い",
 	MAAI: "間合い",
 	RENDA: "連打",
 }
 
 const UPGRADE_SHORT := {
-	BUTTO: "豪打",
+	BUTTO: "ぶっ飛ばす",
 	ONIGIRI: "おにぎり",
 	KENKYAKU: "健脚",
-	KANE: "銭引力",
-	PURITORA: "衝撃波",
-	MEGUMI: "沼の恵み",
-	OKOZUKAI: "臨時収入",
+	KANE: "金",
+	PURITORA: "プリとら",
+	MEGUMI: "恵み",
+	OKOZUKAI: "お小遣い",
 	MAAI: "間合い",
 	RENDA: "連打",
 }
 
+# 狭い校庭の中央は空けて、開始直後に挟まれないようにする。座標は 1600×1100 の校庭。
 const CONE_POINTS: Array[Vector2] = [
-	Vector2(520, 700), Vector2(600, 780), Vector2(540, 880),
-	Vector2(1800, 980), Vector2(1900, 900), Vector2(1760, 1100),
-	Vector2(1200, 360), Vector2(1320, 420), Vector2(1080, 440),
+	Vector2(347, 481), Vector2(400, 536), Vector2(360, 605),
+	Vector2(1200, 674), Vector2(1267, 619), Vector2(1173, 756),
+	Vector2(800, 248), Vector2(880, 289), Vector2(720, 303),
 ]
 
 # 遊んだあとの間隔。6体で最初、そのあと差が少しずつ開く。

@@ -66,7 +66,8 @@ func _balance() -> void:
 	var kenny: Dictionary = Balance.CHARACTERS[Balance.CHAR_KENNY]
 	var take: Dictionary = Balance.CHARACTERS[Balance.CHAR_TAKETCHI]
 	_true(float(massa.speed) < float(boar.speed), "massa slower than boar")
-	_near(float(take.speed), float(boar.speed), "takechi matches boar")
+	_true(float(take.speed) < float(boar.speed), "fast enemy outruns takechi")
+	_true(float(take.speed) > float(massa.speed), "takechi outruns massa")
 	_true(float(kenny.speed) > float(boar.speed), "kenny faster than boar")
 	_eq(Balance.CONE_POINTS.size(), 9, "9 cones")
 	_eq(Balance.UPGRADES.size(), 9, "9 builds")
@@ -168,7 +169,7 @@ func _specials() -> void:
 	nimo.enemies.append(nimo_actor)
 	var empowered = nimo.debug_place(Balance.KIND_NORMAL, nimo.player_pos + Vector2(70, 0), 12, 80.0)
 	nimo._empower_nearby(nimo_actor)
-	_near(empowered.speed, 124.0, "nimoton empowers minions")
+	_near(empowered.speed, 186.0, "nimoton empowers minions")
 	_eq(empowered.touch, 9, "nimoton boosts contact damage")
 	nimo._launch_boss_projectile(nimo_actor, Balance.BOSS_POISON, nimo.player_pos, 12, 1000.0)
 	nimo._move_boss_projectiles(0.2)
@@ -213,35 +214,35 @@ func _specials() -> void:
 func _combat() -> void:
 	var sim = BattleSim.new()
 	_eq(sim.cones.size(), 9, "cones placed")
-	_near(sim.player_pos.x, 1200.0, "start x")
-	_near(sim.player_pos.y, 800.0, "start y")
+	_near(sim.player_pos.x, 800.0, "start x")
+	_near(sim.player_pos.y, 550.0, "start y")
 
 	sim.attacks_enabled = false
 	sim.contact_enabled = false
 	sim.spawns_enabled = false
-	sim.player_pos = Vector2(400, 700)
-	sim.step(2.0, Vector2.RIGHT)
-	_true(sim.player_pos.distance_to(Vector2(520, 700)) >= 43.9, "player stopped by cone")
-	_true(sim.player_pos.x < 520.0, "player did not pass cone")
+	sim.player_pos = Vector2(520, 536)
+	sim.step(2.0, Vector2.LEFT)
+	_true(sim.player_pos.distance_to(Vector2(400, 536)) >= 43.9, "player stopped by cone")
+	_true(sim.player_pos.x > 400.0, "player did not pass cone")
 
 	sim = BattleSim.new()
 	sim.attacks_enabled = false
 	sim.contact_enabled = false
 	sim.spawns_enabled = false
-	var walker = sim.debug_place(Balance.KIND_NORMAL, Vector2(400, 700), 12, 80.0)
-	sim.player_pos = Vector2(700, 700)
+	var walker = sim.debug_place(Balance.KIND_NORMAL, Vector2(520, 536), 12, 80.0)
+	sim.player_pos = Vector2(160, 536)
 	sim.step(3.0, Vector2.ZERO)
-	_true(walker.pos.distance_to(Vector2(520, 700)) >= 37.8, "enemy stopped by cone")
-	_true(walker.pos.x < 520.0, "enemy did not pass cone")
+	_true(walker.pos.distance_to(Vector2(400, 536)) >= 37.8, "enemy stopped by cone")
+	_true(walker.pos.x > 400.0, "enemy did not pass cone")
 
 	sim = BattleSim.new()
 	sim.contact_enabled = false
 	sim.spawns_enabled = false
-	sim.player_pos = Vector2(400, 700)
-	var pushed = sim.debug_place(Balance.KIND_NORMAL, Vector2(470, 700), 100, 0.0)
+	sim.player_pos = Vector2(520, 536)
+	var pushed = sim.debug_place(Balance.KIND_NORMAL, Vector2(470, 536), 100, 0.0)
 	sim.step(1.0, Vector2.ZERO)
-	_near(pushed.pos.x, 482.0, "knockback stops at cone")
-	_near(pushed.pos.y, 700.0, "knockback y")
+	_near(pushed.pos.x, 438.0, "knockback stops at cone")
+	_near(pushed.pos.y, 536.0, "knockback y")
 
 	sim = BattleSim.new()
 	sim.contact_enabled = false
@@ -310,13 +311,13 @@ func _combat() -> void:
 	sim.spawns_enabled = false
 	sim.attacks_enabled = false
 	sim.contact_enabled = false
-	var far = sim.debug_place(Balance.KIND_NORMAL, sim.player_pos + Vector2(950, 0), 12, 0.0)
+	var far = sim.debug_place(Balance.KIND_NORMAL, Vector2(16, 16), 12, 0.0)
 	sim.step(0.05, Vector2.ZERO)
-	_true(not sim.enemies.has(far), "despawn over 900")
+	_true(not sim.enemies.has(far), "despawn over 860")
 	_eq(sim.kills, 0, "despawn is not a kill")
-	var edge = sim.debug_place(Balance.KIND_NORMAL, sim.player_pos + Vector2(900, 0), 12, 0.0)
+	var edge = sim.debug_place(Balance.KIND_NORMAL, Vector2(1500, 550), 12, 0.0)
 	sim.step(0.05, Vector2.ZERO)
-	_true(sim.enemies.has(edge), "900 stays")
+	_true(sim.enemies.has(edge), "inside stays")
 
 	sim = BattleSim.new()
 	sim.spawns_enabled = false
@@ -380,7 +381,7 @@ func _combat() -> void:
 	var frozen: float = sim.time
 	sim.step(3.0, Vector2.RIGHT)
 	_near(sim.time, frozen, "timer pauses in build")
-	_near(sim.player_pos.x, 1200.0, "no move in build")
+	_near(sim.player_pos.x, 800.0, "no move in build")
 
 	sim = BattleSim.new()
 	sim.spawns_enabled = false

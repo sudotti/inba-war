@@ -13,10 +13,10 @@ const TRACK := Color(1, 1, 1, 0.72)
 const MASSA_COLOR := Color("f3ead2")
 const COIN_COLOR := Color("ffc107")
 const TREE_SPOTS: Array[Vector2] = [
-	Vector2(680, 1000),
-	Vector2(1710, 940),
-	Vector2(980, 1140),
-	Vector2(1560, 1100),
+	Vector2(453, 688),
+	Vector2(1140, 646),
+	Vector2(653, 784),
+	Vector2(1040, 756),
 ]
 
 const ART_NORMAL := "res://assets/battle/enemy_normal.png"
@@ -96,10 +96,13 @@ var _boss_banner_name: Label
 var _boss_banner_action: Label
 var _boss_banner_tween: Tween
 var _seen_boss_alert := 0
+var _compact_layout := false
 
 
 func _ready() -> void:
 	_who = SaveStore.playable_character()
+	var viewport_size := get_viewport_rect().size
+	_compact_layout = viewport_size.x < 1080.0 or viewport_size.y < 600.0
 	sim = BattleSim.new(_who)
 	camera = Camera2D.new()
 	camera.position_smoothing_enabled = false
@@ -374,7 +377,7 @@ func _draw() -> void:
 	for actor in sim.enemies:
 		order.append({"y": actor.pos.y, "kind": "enemy", "actor": actor})
 	order.append({"y": sim.player_pos.y, "kind": "player"})
-	order.append({"y": 612.0, "kind": "school"})
+	order.append({"y": 421.0, "kind": "school"})
 	for spot in TREE_SPOTS:
 		order.append({"y": spot.y, "kind": "tree", "pos": spot})
 	order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -827,39 +830,39 @@ func _draw_ground() -> void:
 		patch.a = 0.38
 		draw_set_transform(Vector2(px, py), 0.0, Vector2(1.0, 0.58))
 		draw_circle(Vector2.ZERO, rx, patch)
-	draw_set_transform(Vector2(1200, 1120), 0.0, Vector2(1.0, 0.48))
-	draw_circle(Vector2.ZERO, 540.0, Color("3d5238"))
+	draw_set_transform(Vector2(800, 770), 0.0, Vector2(1.0, 0.48))
+	draw_circle(Vector2.ZERO, 370.0, Color("3d5238"))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var mow := Color(1, 1, 1, 0.045)
 	var y := 20.0
 	while y < Balance.FIELD_H:
 		draw_line(Vector2(0, y), Vector2(Balance.FIELD_W, y), mow, 2.0)
 		y += 48.0
-	_draw_ellipse(Vector2(1200, 1120), 620.0, 300.0, TRACK, 4.0)
-	_draw_ellipse(Vector2(1200, 1120), 470.0, 210.0, Color(1, 1, 1, 0.4), 2.0)
-	var court := Rect2(900, 980, 600, 280)
+	_draw_ellipse(Vector2(800, 770), 413.0, 206.0, TRACK, 4.0)
+	_draw_ellipse(Vector2(800, 770), 313.0, 144.0, Color(1, 1, 1, 0.4), 2.0)
+	var court := Rect2(600, 674, 400, 192)
 	draw_rect(court, TRACK, false, 3.0)
-	draw_line(Vector2(1200, 980), Vector2(1200, 1260), Color(1, 1, 1, 0.45), 2.0, true)
+	draw_line(Vector2(800, 674), Vector2(800, 866), Color(1, 1, 1, 0.45), 2.0, true)
 	draw_colored_polygon(PackedVector2Array([
-		Vector2(1178, 612),
-		Vector2(1222, 612),
-		Vector2(1260, 1560),
-		Vector2(1140, 1560),
+		Vector2(785, 421),
+		Vector2(815, 421),
+		Vector2(840, 1073),
+		Vector2(760, 1073),
 	]), DIRT)
 	draw_colored_polygon(PackedVector2Array([
-		Vector2(1190, 612),
-		Vector2(1210, 612),
-		Vector2(1232, 1560),
-		Vector2(1168, 1560),
+		Vector2(793, 421),
+		Vector2(807, 421),
+		Vector2(821, 1073),
+		Vector2(779, 1073),
 	]), Color("d8bc88"))
-	_draw_bed(Vector2(900, 1000))
-	_draw_bed(Vector2(1500, 980))
+	_draw_bed(Vector2(600, 688))
+	_draw_bed(Vector2(1000, 674))
 	var rim := Color("1e2a1c")
 	draw_rect(Rect2(0, 0, Balance.FIELD_W, 26), rim, true)
 	draw_rect(Rect2(0, Balance.FIELD_H - 26, Balance.FIELD_W, 26), rim, true)
 	draw_rect(Rect2(0, 0, 26, Balance.FIELD_H), rim, true)
 	draw_rect(Rect2(Balance.FIELD_W - 26, 0, 26, Balance.FIELD_H), rim, true)
-	draw_rect(Rect2(780, 606, 840, 14), Color(0, 0, 0, 0.16), true)
+	draw_rect(Rect2(520, 417, 560, 10), Color(0, 0, 0, 0.16), true)
 
 
 func _draw_ellipse(center: Vector2, rx: float, ry: float, color: Color, width: float) -> void:
@@ -882,13 +885,13 @@ func _draw_bed(center: Vector2) -> void:
 
 
 func _draw_school() -> void:
-	var left := 760.0
-	var right := 1640.0
-	var wall := 536.0
-	var base := 612.0
+	var left := 507.0
+	var right := 1093.0
+	var wall := 369.0
+	var base := 421.0
 	draw_rect(Rect2(left, wall, right - left, base - wall), Color("efe3c8"), true)
 	draw_rect(Rect2(left, wall, right - left, base - wall), Color("2a241c"), false, 4.0)
-	var peak := Vector2((left + right) * 0.5, 516.0)
+	var peak := Vector2((left + right) * 0.5, 355.0)
 	draw_colored_polygon(PackedVector2Array([
 		Vector2(left - 26, wall + 8),
 		peak,
@@ -897,20 +900,20 @@ func _draw_school() -> void:
 	draw_colored_polygon(PackedVector2Array([
 		Vector2(left - 26, wall + 8),
 		peak,
-		peak + Vector2(0, 14),
-		Vector2(left - 6, wall + 20),
+		peak + Vector2(0, 10),
+		Vector2(left - 6, wall + 13),
 	]), Color("2d3b56"))
 	var frame := Color("2a241c")
 	var glass := Color("9aada8")
-	for x in [990.0, 1090.0, 1320.0, 1420.0, 1520.0]:
-		draw_rect(Rect2(x, 552, 52, 36), frame, true)
-		draw_rect(Rect2(x + 3, 555, 46, 30), glass, true)
-		draw_line(Vector2(x + 26, 555), Vector2(x + 26, 585), frame, 2.0)
-	draw_rect(Rect2(792, 552, 176, 32), Color("17324f"), true)
-	draw_string(UiFont.font(), Vector2(814, 574), "印旛中学校", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("f7f1e6"))
-	draw_rect(Rect2(1172, 568, 56, 44), Color("6d3b2c"), true)
-	draw_rect(Rect2(1172, 568, 56, 44), Color("2a241c"), false, 3.0)
-	draw_circle(Vector2(1216, 592), 3.0, Color("e2b43a"))
+	for x in [660.0, 727.0, 880.0, 947.0, 1013.0]:
+		draw_rect(Rect2(x, 381, 35, 25), frame, true)
+		draw_rect(Rect2(x + 2, 383, 31, 20), glass, true)
+		draw_line(Vector2(x + 17, 383), Vector2(x + 17, 402), frame, 2.0)
+	draw_rect(Rect2(528, 381, 117, 22), Color("17324f"), true)
+	draw_string(UiFont.font(), Vector2(543, 397), "印旛中学校", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("f7f1e6"))
+	draw_rect(Rect2(781, 391, 37, 30), Color("6d3b2c"), true)
+	draw_rect(Rect2(781, 391, 37, 30), Color("2a241c"), false, 3.0)
+	draw_circle(Vector2(811, 407), 2.0, Color("e2b43a"))
 
 
 func _draw_tree(foot: Vector2) -> void:
@@ -955,7 +958,7 @@ func _view_rect() -> Rect2:
 func _sync_hud() -> void:
 	var remain := maxf(0.0, Balance.ROUND_SECONDS - sim.time)
 	time_label.text = "残り  %s" % _clock(remain)
-	hp_label.text = "HP  %d / %d" % [sim.player_hp, sim.player_max_hp]
+	hp_label.text = "体力  %d / %d" % [sim.player_hp, sim.player_max_hp]
 	var ratio := 0.0 if sim.player_max_hp <= 0 else clampf(float(sim.player_hp) / float(sim.player_max_hp), 0.0, 1.0)
 	hp_fill.anchor_right = ratio
 	var healthy := Color("b7c4c2")
@@ -1004,7 +1007,7 @@ func _build_hud() -> void:
 
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 18)
+	row.add_theme_constant_override("separation", 8 if _compact_layout else 18)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	bar.add_child(row)
 
@@ -1016,31 +1019,31 @@ func _build_hud() -> void:
 	atlas.region = Rect2(tw * 0.12, 0, tw * 0.76, th * 0.4)
 	var chip := TextureRect.new()
 	chip.texture = atlas
-	chip.custom_minimum_size = Vector2(48, 48)
+	chip.custom_minimum_size = Vector2(40, 40) if _compact_layout else Vector2(48, 48)
 	chip.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	chip.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(chip)
 
-	var who_label := UiFont.label(_who, 22, UiFont.YELLOW)
+	var who_label := UiFont.label(_who, 18 if _compact_layout else 22, UiFont.YELLOW)
 	who_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	who_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(who_label)
 
-	time_label = UiFont.label("残り  3:00.0", 30, UiFont.PAPER)
-	score_label = UiFont.label("スコア  0", 22, UiFont.PAPER)
-	coin_label = UiFont.label("コイン  0", 22, UiFont.YELLOW)
-	hp_label = UiFont.label("HP  100 / 100", 20, UiFont.PAPER)
+	time_label = UiFont.label("残り  3:00", 22 if _compact_layout else 30, UiFont.PAPER)
+	score_label = UiFont.label("得点  0", 18 if _compact_layout else 22, UiFont.PAPER)
+	coin_label = UiFont.label("コイン  0", 18 if _compact_layout else 22, UiFont.YELLOW)
+	hp_label = UiFont.label("体力  100 / 100", 17 if _compact_layout else 20, UiFont.PAPER)
 	for node in [time_label, hp_label, score_label, coin_label]:
 		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		node.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 	var hp_box := VBoxContainer.new()
 	hp_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hp_box.custom_minimum_size = Vector2(240, 0)
+	hp_box.custom_minimum_size = Vector2(176, 0) if _compact_layout else Vector2(240, 0)
 	hp_box.add_child(hp_label)
 	var track := Control.new()
-	track.custom_minimum_size = Vector2(220, 12)
+	track.custom_minimum_size = Vector2(160, 10) if _compact_layout else Vector2(220, 12)
 	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hp_box.add_child(track)
 	var back := ColorRect.new()
@@ -1088,7 +1091,7 @@ func _build_hud() -> void:
 
 	var special_box := VBoxContainer.new()
 	special_box.add_theme_constant_override("separation", 4)
-	UiFont.place(special_box, 0.80, 0.72, 0.98, 0.91)
+	UiFont.place(special_box, 0.76 if _compact_layout else 0.80, 0.70 if _compact_layout else 0.72, 0.98, 0.94 if _compact_layout else 0.91)
 	root.add_child(special_box)
 	special_gauge = ProgressBar.new()
 	special_gauge.min_value = 0.0
@@ -1098,8 +1101,8 @@ func _build_hud() -> void:
 	special_gauge.add_theme_stylebox_override("background", UiFont.style(Color(0.05, 0.05, 0.05, 0.88), Color("c8a456"), 2, 7))
 	special_gauge.add_theme_stylebox_override("fill", UiFont.style(Color("d7b072"), Color("fff0c2"), 1, 6))
 	special_box.add_child(special_gauge)
-	special_button = UiFont.button("必殺技 0% [Space]", 18)
-	special_button.custom_minimum_size = Vector2(0, 64)
+	special_button = UiFont.button("必殺技 0%", 16 if _compact_layout else 18)
+	special_button.custom_minimum_size = Vector2(0, 54) if _compact_layout else Vector2(0, 64)
 	special_button.pressed.connect(_activate_special)
 	special_button.add_theme_stylebox_override("disabled", UiFont.style(Color("24201b"), Color("68583b"), 2, 12))
 	special_button.add_theme_color_override("font_disabled_color", Color("c7b991"))
@@ -1246,9 +1249,9 @@ func _update_special_hud() -> void:
 	if sim.special_active_left > 0.0:
 		special_button.text = "必殺技  %.1f秒" % sim.special_active_left
 	elif sim.special_charge >= Balance.SPECIAL_GAUGE_MAX:
-		special_button.text = "必殺技 発動 [Space]"
+		special_button.text = "必殺技 発動" if _compact_layout else "必殺技 発動 [Space]"
 	else:
-		special_button.text = "必殺技 %d%% [Space]" % percent
+		special_button.text = "必殺技 %d%%" % percent if _compact_layout else "必殺技 %d%% [Space]" % percent
 	special_button.disabled = not sim.can_activate_special()
 	special_button.modulate = Color.WHITE
 
@@ -1381,11 +1384,11 @@ func _build_choice() -> void:
 	col.add_theme_constant_override("separation", 16)
 	build_root.add_child(col)
 
-	var heading := UiFont.label("強化選択", 40, UiFont.PAPER)
+	var heading := UiFont.label("強化選択", 32 if _compact_layout else 40, UiFont.PAPER)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(heading)
-	var note := UiFont.label("20秒以内に選択  /  時間切れで左端を選択", 22, UiFont.BRASS)
+	var note := UiFont.label("時間内に選択 / 期限後は左端", 18 if _compact_layout else 22, UiFont.BRASS)
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(note)
@@ -1393,7 +1396,7 @@ func _build_choice() -> void:
 	card_row = HBoxContainer.new()
 	card_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	card_row.add_theme_constant_override("separation", 22)
+	card_row.add_theme_constant_override("separation", 8 if _compact_layout else 22)
 	card_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(card_row)
 
@@ -1446,7 +1449,13 @@ func _card(index: int, id: String) -> Control:
 	var accents: Array[Color] = [Color("2a241c"), Color("8c6840"), Color("6a4030")]
 	var accent: Color = accents[index % accents.size()]
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(360, 280)
+	var viewport_size := get_viewport_rect().size
+	var card_width := 360.0
+	var card_height := 280.0
+	if _compact_layout:
+		card_width = maxf(150.0, minf(240.0, (viewport_size.x * 0.82 - 16.0) / 3.0))
+		card_height = clampf(viewport_size.y * 0.52, 200.0, 260.0)
+	button.custom_minimum_size = Vector2(card_width, card_height)
 	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_stylebox_override("normal", UiFont.style(UiFont.PAPER, accent, 5, 18))
 	button.add_theme_stylebox_override("hover", UiFont.style(UiFont.YELLOW, accent, 5, 18))
@@ -1478,16 +1487,16 @@ func _card(index: int, id: String) -> Control:
 	box.add_theme_constant_override("separation", 10)
 	button.add_child(box)
 
-	var name := UiFont.label(Balance.UPGRADE_NAME[id], 28, UiFont.INK)
+	var name := UiFont.label(Balance.UPGRADE_NAME[id], 23 if _compact_layout else 28, UiFont.INK)
 	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name.add_theme_constant_override("outline_size", 0)
 	box.add_child(name)
-	var level := UiFont.label("レベル %d  →  %d" % [current, nxt], 24, UiFont.PINK)
+	var level := UiFont.label("レベル %d  →  %d" % [current, nxt], 19 if _compact_layout else 24, UiFont.PINK)
 	level.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	level.add_theme_constant_override("outline_size", 0)
 	box.add_child(level)
-	var body := UiFont.label(Balance.upgrade_blurb(id, nxt), 22, UiFont.INK)
+	var body := UiFont.label(Balance.upgrade_blurb(id, nxt), 17 if _compact_layout else 22, UiFont.INK)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_theme_constant_override("outline_size", 0)

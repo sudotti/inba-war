@@ -1,8 +1,7 @@
 extends Control
 
-const RADIUS := 104.0
-const KNOB := 42.0
-const DEAD := 14.0
+const RADIUS_MIN := 72.0
+const RADIUS_MAX := 112.0
 
 var direction := Vector2.ZERO
 
@@ -40,20 +39,22 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _begin(pos: Vector2) -> void:
+	var radius := _radius()
 	_pressing = true
 	_origin = Vector2(
-		clampf(pos.x, RADIUS, maxf(RADIUS, size.x - RADIUS)),
-		clampf(pos.y, RADIUS, maxf(RADIUS, size.y - RADIUS))
+		clampf(pos.x, radius, maxf(radius, size.x - radius)),
+		clampf(pos.y, radius, maxf(radius, size.y - radius))
 	)
 	_drag(pos)
 
 
 func _drag(pos: Vector2) -> void:
 	var delta := pos - _origin
-	if delta.length() < DEAD:
+	var radius := _radius()
+	if delta.length() < radius * 0.135:
 		direction = Vector2.ZERO
 		return
-	direction = delta / RADIUS
+	direction = delta / radius
 	if direction.length() > 1.0:
 		direction = direction.normalized()
 
@@ -64,13 +65,22 @@ func _end() -> void:
 
 
 func _default_base() -> Vector2:
-	return Vector2(168, maxf(168, size.y - 168))
+	var offset := _radius() * 1.62
+	return Vector2(offset, maxf(offset, size.y - offset))
+
+
+func _radius() -> float:
+	var screen_width := size.x / 0.46
+	var target := minf(size.y * 0.145, screen_width * 0.08125)
+	return clampf(target, RADIUS_MIN, RADIUS_MAX)
 
 
 func _draw() -> void:
+	var radius := _radius()
+	var knob_radius := radius * 0.4
 	var base := _origin if _pressing else _default_base()
-	var knob := base + direction * RADIUS
-	draw_circle(base, RADIUS, Color(0, 0, 0, 0.28))
-	draw_arc(base, RADIUS, 0, TAU, 48, Color(1, 1, 1, 0.7), 4.0, true)
-	draw_circle(knob, KNOB, Color("f3ead2"))
-	draw_arc(knob, KNOB, 0, TAU, 32, Color("161616"), 4.0, true)
+	var knob := base + direction * radius
+	draw_circle(base, radius, Color(0, 0, 0, 0.34))
+	draw_arc(base, radius, 0, TAU, 48, Color(1, 1, 1, 0.76), 4.0, true)
+	draw_circle(knob, knob_radius, Color("f3ead2"))
+	draw_arc(knob, knob_radius, 0, TAU, 32, Color("161616"), 4.0, true)

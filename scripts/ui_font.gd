@@ -17,6 +17,9 @@ const GRASS := Color("2a241c")
 const GRASS_DARK := Color("1a1612")
 const YELLOW := BRASS
 const NAVY := Color("14110e")
+const ROYAL := Color("101c46")
+const ROYAL_DEEP := Color("0a1030")
+const GOLD := Color("f0c75e")
 
 static var _font: Font
 
@@ -76,13 +79,43 @@ static func button(text: String, size: int = 28) -> Button:
 	node.add_theme_color_override("font_pressed_color", INK)
 	node.add_theme_color_override("font_focus_color", INK)
 	node.add_theme_color_override("font_disabled_color", Color("5c564c"))
-	node.add_theme_stylebox_override("normal", style(PAPER, BRASS_DEEP, 2, 12))
-	node.add_theme_stylebox_override("hover", style(BRASS, INK, 2, 12))
-	node.add_theme_stylebox_override("pressed", style(Color("c9a56a"), INK, 2, 12))
+	node.add_theme_stylebox_override("normal", style(PAPER, BRASS, 2, 12))
+	node.add_theme_stylebox_override("hover", style(GOLD, BRASS, 2, 12))
+	node.add_theme_stylebox_override("pressed", style(Color("e2b45a"), BRASS, 2, 12))
 	node.add_theme_stylebox_override("focus", style(PAPER, BRASS, 2, 12))
 	node.add_theme_stylebox_override("disabled", style(Color("8a8174"), Color("3a342c"), 2, 12))
 	node.custom_minimum_size = Vector2(280, 72)
 	return node
+
+
+static func royal_button(text: String, size: int = 24, primary: bool = false) -> Button:
+	var node := Button.new()
+	node.text = text
+	node.add_theme_font_override("font", font())
+	node.add_theme_font_size_override("font_size", size)
+	var text_color := PAPER if not primary else INK
+	node.add_theme_color_override("font_color", text_color)
+	node.add_theme_color_override("font_hover_color", text_color)
+	node.add_theme_color_override("font_pressed_color", text_color)
+	node.add_theme_color_override("font_focus_color", text_color)
+	node.add_theme_color_override("font_disabled_color", Color("5c564c"))
+	if primary:
+		node.add_theme_stylebox_override("normal", style(GOLD, Color("fff0c2"), 3, 14))
+		node.add_theme_stylebox_override("hover", style(Color("ffe08a"), Color("fff0c2"), 3, 14))
+		node.add_theme_stylebox_override("pressed", style(Color("e2b45a"), BRASS, 3, 14))
+		node.add_theme_stylebox_override("focus", style(GOLD, Color("fff0c2"), 3, 14))
+	else:
+		node.add_theme_stylebox_override("normal", style(ROYAL, BRASS, 3, 14))
+		node.add_theme_stylebox_override("hover", style(Color("26346e"), GOLD, 3, 14))
+		node.add_theme_stylebox_override("pressed", style(Color("1a2650"), BRASS, 3, 14))
+		node.add_theme_stylebox_override("focus", style(ROYAL, BRASS, 3, 14))
+	node.add_theme_stylebox_override("disabled", style(Color("3a342c"), Color("3a342c"), 3, 14))
+	node.custom_minimum_size = Vector2(240, 68)
+	return node
+
+
+static func royal_panel(fill: Color = ROYAL, border: Color = BRASS, width: int = 3, radius: int = 16) -> StyleBoxFlat:
+	return style(fill, border, width, radius)
 
 
 static func full_rect(node: Control) -> void:

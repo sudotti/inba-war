@@ -64,9 +64,9 @@ func _process(_dt: float) -> void:
 func _pose_battle(hitting: bool) -> void:
 	var battle := get_tree().current_scene
 	battle.set_process(false)
-	battle.sim.player_pos = Vector2(1200, 800)
+	battle.sim.player_pos = Vector2(800, 550)
 	battle.sim.enemies.clear()
-	battle.sim.debug_place("normal", Vector2(1330, 810), 80, 0.0)
+	battle.sim.debug_place("normal", Vector2(930, 560), 80, 0.0)
 	battle.sim.time = 8.0
 	battle._wish = Vector2(-1, 0)
 	if hitting:

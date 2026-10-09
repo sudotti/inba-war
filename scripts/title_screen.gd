@@ -5,74 +5,163 @@ const UiFont = preload("res://scripts/ui_font.gd")
 
 const POSTER := "res://assets/ui/title_trio.png"
 
+var _lights: Array[Dictionary] = []
+var _t := 0.0
+
 
 func _ready() -> void:
-	UiFont.full_rect(self)
-	var poster := TextureRect.new()
-	poster.texture = load(POSTER)
-	poster.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	poster.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	poster.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(poster)
-	add_child(poster)
+	_seed_lights()
+	_build_background()
+	_build_title()
+	_build_poster()
+	_build_stats()
+	_build_menu()
+
+
+func _process(dt: float) -> void:
+	_t += dt
+	queue_redraw()
+
+
+func _draw() -> void:
+	for light in _lights:
+		var x: float = float(light.x) * size.x
+		var y: float = float(light.y) * size.y
+		var r: float = float(light.r)
+		var tw := 0.5 + 0.5 * sin(_t * float(light.hz) + float(light.phase))
+		var c := Color(1.0, 0.82, 0.42, 0.05 + 0.20 * tw)
+		draw_circle(Vector2(x, y), r * (0.75 + 0.5 * tw), c)
+
+
+func _seed_lights() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	for i in 46:
+		_lights.append({
+			"x": rng.randf(),
+			"y": rng.randf(),
+			"r": rng.randf_range(2.0, 7.0),
+			"hz": rng.randf_range(0.4, 1.6),
+			"phase": rng.randf_range(0.0, TAU),
+		})
+
+
+func _build_background() -> void:
+	var grad := Gradient.new()
+	grad.add_point(0.0, UiFont.ROYAL_DEEP)
+	grad.add_point(0.45, UiFont.ROYAL)
+	grad.add_point(1.0, UiFont.ROYAL_DEEP)
+	var tex := GradientTexture1D.new()
+	tex.gradient = grad
+	tex.width = 512
+	var bg := TextureRect.new()
+	bg.texture = tex
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(bg)
+	add_child(bg)
 	var shade := ColorRect.new()
-	shade.color = Color(0.04, 0.04, 0.06, 0.18)
+	shade.color = Color(0.02, 0.03, 0.10, 0.34)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.full_rect(shade)
 	add_child(shade)
 
-	var title := UiFont.label(Balance.TITLE, 58, UiFont.PAPER)
+
+func _build_title() -> void:
+	var panel := GoldFrame.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.place(panel, 0.26, 0.045, 0.74, 0.215)
+	add_child(panel)
+	var col := VBoxContainer.new()
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 4)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(col)
+	panel.add_child(col)
+	var title := UiFont.label(Balance.TITLE, 62, UiFont.GOLD)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(title, 0.035, 0.035, 0.62, 0.15)
-	add_child(title)
-	var subtitle := UiFont.label("校庭に、三分の決戦。", 20, UiFont.BRASS)
+	col.add_child(title)
+	var subtitle := UiFont.label("校庭に、三分の決戦。", 22, UiFont.CREAM)
 	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(subtitle, 0.04, 0.15, 0.50, 0.21)
-	add_child(subtitle)
+	col.add_child(subtitle)
 
-	var menu_band := ColorRect.new()
-	menu_band.color = Color("15120f")
-	menu_band.modulate.a = 0.94
-	menu_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(menu_band, 0.0, 0.76, 1.0, 1.0)
-	add_child(menu_band)
 
-	var menu := HBoxContainer.new()
-	menu.add_theme_constant_override("separation", 10)
-	menu.alignment = BoxContainer.ALIGNMENT_CENTER
-	UiFont.place(menu, 0.025, 0.79, 0.975, 0.97)
-	add_child(menu)
-	var stats := VBoxContainer.new()
-	stats.custom_minimum_size = Vector2(270, 0)
-	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stats.add_theme_constant_override("separation", 3)
-	menu.add_child(stats)
+func _build_poster() -> void:
+	var panel := GoldFrame.new()
+	panel.fill = Color(0.04, 0.06, 0.18, 0.55)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.place(panel, 0.335, 0.255, 0.665, 0.705)
+	add_child(panel)
+	var poster := TextureRect.new()
+	poster.texture = load(POSTER)
+	poster.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	poster.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	poster.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.place(poster, 0.02, 0.02, 0.98, 0.98)
+	panel.add_child(poster)
+
+
+func _build_stats() -> void:
+	var band := GoldFrame.new()
+	band.fill = Color(0.04, 0.06, 0.18, 0.72)
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.place(band, 0.24, 0.725, 0.76, 0.815)
+	add_child(band)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 48)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(row)
+	band.add_child(row)
 	var best := int(SaveStore.data.get("best_score", 0))
 	var when := str(SaveStore.data.get("best_datetime", ""))
 	var best_text := "自己ベスト  記録なし" if when == "" else "自己ベスト  %d" % best
-	stats.add_child(UiFont.label(best_text, 22, UiFont.PAPER))
+	row.add_child(UiFont.label(best_text, 22, UiFont.PAPER))
 	var yen := int(SaveStore.data.get("yen", 0))
-	stats.add_child(UiFont.label("所持金  %d イェン" % yen, 18, UiFont.BRASS))
-	menu.add_child(_menu_button("出撃", 210, true, _start))
-	menu.add_child(_menu_button("ランキング", 190, false, _open_ranking))
-	menu.add_child(_menu_button("敵図鑑", 170, false, _open_bestiary))
-	menu.add_child(_menu_button("なかむら商店", 210, false, _open_shop))
+	row.add_child(UiFont.label("所持金  %d イェン" % yen, 22, UiFont.GOLD))
 
 
-func _menu_button(text: String, width: float, primary: bool, action: Callable) -> Button:
-	var button := UiFont.button(text, 22)
-	button.custom_minimum_size = Vector2(width, 68)
-	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var fill := UiFont.BRASS if primary else Color("211c19")
-	var text_color := UiFont.INK if primary else UiFont.PAPER
-	button.add_theme_stylebox_override("normal", UiFont.style(fill, UiFont.BRASS, 2, 5))
-	button.add_theme_stylebox_override("hover", UiFont.style(Color("e76f45"), UiFont.PAPER, 2, 5))
-	button.add_theme_stylebox_override("pressed", UiFont.style(Color("b94c36"), UiFont.PAPER, 2, 5))
-	button.add_theme_color_override("font_color", text_color)
-	button.add_theme_color_override("font_hover_color", UiFont.PAPER)
-	button.add_theme_color_override("font_pressed_color", UiFont.PAPER)
-	button.pressed.connect(action)
-	return button
+func _build_menu() -> void:
+	var viewport_size := get_viewport_rect().size
+	var compact := viewport_size.x < 1120.0 or viewport_size.y < 560.0
+	if compact:
+		var col := VBoxContainer.new()
+		col.alignment = BoxContainer.ALIGNMENT_CENTER
+		col.add_theme_constant_override("separation", 10)
+		UiFont.place(col, 0.10, 0.845, 0.90, 0.985)
+		add_child(col)
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 12)
+		grid.add_theme_constant_override("v_separation", 8)
+		grid.alignment = BoxContainer.ALIGNMENT_CENTER
+		col.add_child(grid)
+		for item in _menu_items():
+			var button := UiFont.royal_button(str(item[0]), 22, bool(item[1]))
+			button.custom_minimum_size = Vector2(300, 56)
+			button.pressed.connect(item[2])
+			grid.add_child(button)
+		return
+	var menu := HBoxContainer.new()
+	menu.alignment = BoxContainer.ALIGNMENT_CENTER
+	menu.add_theme_constant_override("separation", 18)
+	UiFont.place(menu, 0.06, 0.845, 0.94, 0.985)
+	add_child(menu)
+	for item in _menu_items():
+		var button := UiFont.royal_button(str(item[0]), 24, bool(item[1]))
+		button.custom_minimum_size = Vector2(230, 64)
+		button.pressed.connect(item[2])
+		menu.add_child(button)
+
+
+func _menu_items() -> Array:
+	return [
+		["出撃", true, _start],
+		["ランキング", false, _open_ranking],
+		["敵図鑑", false, _open_bestiary],
+		["なかむら商店", false, _open_shop],
+	]
 
 
 func _start() -> void:
@@ -90,3 +179,28 @@ func _open_ranking() -> void:
 
 func _open_bestiary() -> void:
 	get_tree().change_scene_to_file("res://scenes/bestiary.tscn")
+
+
+class GoldFrame extends Control:
+	var fill: Color = Color(0.05, 0.07, 0.20, 0.86)
+	var gold := UiFont.BRASS
+	var gold_bright := UiFont.GOLD
+
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, fill, true)
+		draw_rect(r, gold, false, 3.0)
+		var inner := r.grow(-9.0)
+		draw_rect(inner, gold, false, 1.5)
+		for corner in [Vector2.ZERO, Vector2(size.x, 0.0), Vector2(0.0, size.y), Vector2(size.x, size.y)]:
+			var c := Vector2(
+				clampf(corner.x, 12.0, size.x - 12.0),
+				clampf(corner.y, 12.0, size.y - 12.0)
+			)
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(0.0, -10.0),
+				c + Vector2(10.0, 0.0),
+				c + Vector2(0.0, 10.0),
+				c + Vector2(-10.0, 0.0),
+			]), gold_bright)
