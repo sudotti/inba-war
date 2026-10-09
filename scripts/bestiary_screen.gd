@@ -2,6 +2,7 @@ extends Control
 
 const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
+const SafeArea = preload("res://scripts/safe_area.gd")
 const LOCK_ART := "res://assets/ui/lock.png"
 
 var _entries: VBoxContainer
@@ -13,115 +14,156 @@ var _description: Label
 var _special: Label
 var _record: Label
 var _selected := ""
+var _main_margin: MarginContainer
+var _is_portrait := false
 
 
 func _ready() -> void:
-	UiFont.full_rect(self)
+	_is_portrait = UiFont.portrait(get_viewport_rect().size)
+	get_viewport().size_changed.connect(_on_resized)
+	_build()
+	_refresh()
+
+
+func _on_resized() -> void:
+	var new_portrait = UiFont.portrait(get_viewport_rect().size)
+	if new_portrait != _is_portrait:
+		_is_portrait = new_portrait
+		_build()
+		_refresh()
+
+
+func _build() -> void:
+	for child in get_children():
+		child.queue_free()
+
 	var background := ColorRect.new()
 	background.color = UiFont.NIGHT
+	background.anchors_preset = Control.PRESET_FULL_RECT
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(background)
 	add_child(background)
 
+	_main_margin = MarginContainer.new()
+	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
+	SafeArea.apply_safe_padding(_main_margin, get_viewport())
+	add_child(_main_margin)
+
+	var root := VBoxContainer.new()
+	root.alignment = BoxContainer.ALIGNMENT_CENTER
+	root.add_theme_constant_override("separation", 12)
+	_main_margin.add_child(root)
+
+	# Header
 	var header := HBoxContainer.new()
 	header.alignment = BoxContainer.ALIGNMENT_CENTER
-	UiFont.place(header, 0.04, 0.035, 0.96, 0.13)
-	add_child(header)
-	var title := UiFont.label("敵図鑑", 40, UiFont.PAPER)
+	header.add_theme_constant_override("separation", 16)
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(header)
+
+	var title := UiFont.label("敵図鑑", 36, UiFont.PAPER)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
+
 	var count: int = SaveStore.data.enemy_seen.size()
 	header.add_child(UiFont.label("遭遇 %d / %d" % [count, Balance.ENEMY_KINDS.size()], 20, UiFont.BRASS))
+
 	var back := UiFont.button("戻る", 20)
-	back.custom_minimum_size = Vector2(150, 56)
+	back.custom_minimum_size = Vector2(140, 54)
 	back.pressed.connect(_back)
 	header.add_child(back)
 
-	var portrait := UiFont.portrait(get_viewport_rect().size)
-	var body := BoxContainer.new()
-	if portrait:
-		body = VBoxContainer.new()
-		body.add_theme_constant_override("separation", 12)
-	else:
-		body = HBoxContainer.new()
-		body.add_theme_constant_override("separation", 18)
-	UiFont.place(body, 0.04, 0.16, 0.96, 0.94)
-	add_child(body)
-	var list := PanelContainer.new()
-	if portrait:
-		list.custom_minimum_size = Vector2(0, 250)
-	else:
-		list.custom_minimum_size = Vector2(290, 0)
-	list.add_theme_stylebox_override("panel", UiFont.style(UiFont.CARD, UiFont.BRASS_DEEP, 2, 4))
-	body.add_child(list)
+	# Body
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 12)
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(body)
+
+	# List panel
+	var list_panel := PanelContainer.new()
+	list_panel.add_theme_stylebox_override("panel", UiFont.style(UiFont.CARD, UiFont.BRASS_DEEP, 2, 4))
+	body.add_child(list_panel)
+
 	var list_margin := MarginContainer.new()
 	list_margin.add_theme_constant_override("margin_left", 12)
 	list_margin.add_theme_constant_override("margin_right", 12)
 	list_margin.add_theme_constant_override("margin_top", 14)
 	list_margin.add_theme_constant_override("margin_bottom", 14)
-	list.add_child(list_margin)
+	list_panel.add_child(list_margin)
+
 	var list_col := VBoxContainer.new()
 	list_col.add_theme_constant_override("separation", 8)
 	list_margin.add_child(list_col)
+
 	list_col.add_child(UiFont.label("遭遇した敵", 22, UiFont.BRASS))
+
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	list_col.add_child(scroll)
+
 	_entries = VBoxContainer.new()
 	_entries.add_theme_constant_override("separation", 6)
 	_entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_entries)
 
-	var detail := BoxContainer.new()
-	if portrait:
-		detail = VBoxContainer.new()
-		detail.alignment = BoxContainer.ALIGNMENT_CENTER
-		detail.add_theme_constant_override("separation", 10)
-	else:
-		detail = HBoxContainer.new()
-		detail.add_theme_constant_override("separation", 26)
+	# Detail panel
+	var detail := VBoxContainer.new()
+	detail.alignment = BoxContainer.ALIGNMENT_CENTER
+	detail.add_theme_constant_override("separation", 10)
+	detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if not portrait:
-		detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(detail)
+
+	# Portrait
 	var portrait_panel := PanelContainer.new()
-	portrait_panel.custom_minimum_size = Vector2(360 if not portrait else 0, 0 if not portrait else 300)
 	portrait_panel.add_theme_stylebox_override("panel", UiFont.style(Color("201b18"), UiFont.BRASS_DEEP, 2, 4))
+	portrait_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.add_child(portrait_panel)
+
 	_portrait = TextureRect.new()
-	_portrait.custom_minimum_size = Vector2(340, 360 if not portrait else 280)
+	_portrait.custom_minimum_size = Vector2(0, 280)
+	_portrait.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	portrait_panel.add_child(_portrait)
 
+	# Info
 	var copy := VBoxContainer.new()
 	copy.alignment = BoxContainer.ALIGNMENT_CENTER
 	copy.add_theme_constant_override("separation", 12)
 	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.add_child(copy)
-	_name = UiFont.label("", 38, UiFont.PAPER)
+
+	_name = UiFont.label("", 34, UiFont.PAPER)
 	copy.add_child(_name)
-	_role = UiFont.label("", 20, UiFont.BRASS)
+
+	_role = UiFont.label("", 18, UiFont.BRASS)
 	copy.add_child(_role)
-	_stats = UiFont.label("", 22, UiFont.CREAM)
+
+	_stats = UiFont.label("", 20, UiFont.CREAM)
 	copy.add_child(_stats)
-	_special = UiFont.label("", 20, UiFont.GOLD)
+
+	_special = UiFont.label("", 18, UiFont.GOLD)
 	copy.add_child(_special)
-	_description = UiFont.label("", 22, UiFont.PAPER)
+
+	_description = UiFont.label("", 20, UiFont.PAPER)
 	_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_description.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	copy.add_child(_description)
-	_record = UiFont.label("", 20, UiFont.YELLOW)
+
+	_record = UiFont.label("", 18, UiFont.YELLOW)
 	copy.add_child(_record)
 
 	_selected = Balance.ENEMY_KINDS[0]
-	_refresh()
 
 
 func _refresh() -> void:
 	for child in _entries.get_children():
 		_entries.remove_child(child)
 		child.free()
+
 	for kind in Balance.ENEMY_KINDS:
 		var seen: bool = SaveStore.data.enemy_seen.has(kind)
 		var caption := str(Balance.ENEMY_NAME[kind]) if seen else "？？？？？"
@@ -133,6 +175,7 @@ func _refresh() -> void:
 		button.add_theme_color_override("font_color", UiFont.INK if kind == _selected else UiFont.PAPER)
 		button.pressed.connect(_select.bind(kind))
 		_entries.add_child(button)
+
 	_show_entry(_selected)
 
 
@@ -153,6 +196,7 @@ func _show_entry(kind: String) -> void:
 		_description.text = "戦場で出会うと記録される。"
 		_record.text = "撃破  ―"
 		return
+
 	_portrait.texture = _portrait_texture(kind)
 	_name.text = str(Balance.ENEMY_NAME[kind])
 	_role.text = "乱入ボス" if Balance.BOSS_KINDS.has(kind) else "校庭の敵"
