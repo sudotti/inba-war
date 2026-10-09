@@ -72,6 +72,8 @@ func _refill() -> void:
 	for child in _main_container.get_children():
 		_main_container.remove_child(child)
 		child.queue_free()
+	# Reapply safe area padding for new orientation
+	SafeArea.apply_safe_padding(_main_margin, get_viewport())
 	# Use call_deferred to avoid issues with await in debug mode
 	call_deferred("_fill")
 
