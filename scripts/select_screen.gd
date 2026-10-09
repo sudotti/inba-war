@@ -24,36 +24,62 @@ var _closet_list: VBoxContainer
 var _closet_who := ""
 var _is_portrait := false
 var _main_margin: MarginContainer
-var _rebuilding := false
+var _main_container: Control
+var _timer := 0.0
 
 
 func _ready() -> void:
 	_is_portrait = _portrait_now()
-	get_viewport().size_changed.connect(_on_resized)
-	_build()
+
+	# Persistent background
+	var night := ColorRect.new()
+	night.color = Color(0.05, 0.04, 0.08, 1.0)
+	night.anchors_preset = Control.PRESET_FULL_RECT
+	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(night)
+
+	# Persistent safe area margin
+	_main_margin = MarginContainer.new()
+	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
+	SafeArea.apply_safe_padding(_main_margin, get_viewport())
+	add_child(_main_margin)
+
+	# Fixed container that stays alive - only its children are rebuilt
+	_main_container = VBoxContainer.new()
+	_main_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	_main_container.add_theme_constant_override("separation", 12)
+	_main_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_main_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_main_margin.add_child(_main_container)
+
+	_fill()
 	_build_closet()
 
 
-func _on_resized() -> void:
-	if _rebuilding:
+func _process(delta: float) -> void:
+	_timer -= delta
+	if _timer > 0.0:
 		return
-	var new_portrait = _portrait_now()
-	if new_portrait != _is_portrait:
-		_is_portrait = new_portrait
-		_rebuilding = true
-		call_deferred("_rebuild")
+	var p := _portrait_now()
+	if p != _is_portrait:
+		_is_portrait = p
+		_timer = 0.5  # Debounce: ignore orientation changes for 0.5s
+		_refill()
 
 
-func _rebuild() -> void:
-	_build()
-	_rebuilding = false
+func _refill() -> void:
+	# Clear only the children of the fixed container
+	for child in _main_container.get_children():
+		_main_container.remove_child(child)
+		child.queue_free()
+	# Wait one frame for queue_free to complete
+	await get_tree().process_frame
+	_fill()
 
 
 func _portrait_now() -> bool:
-	# Use window size instead of viewport rect (stretch mode affects viewport)
 	var win_size := Vector2.ZERO
 	var success := false
-	# Try to get window size, fall back if not available
 	var methods := DisplayServer.get_method_list()
 	for m in methods:
 		if m.name == "window_get_size":
@@ -65,36 +91,13 @@ func _portrait_now() -> bool:
 	return UiFont.portrait(get_viewport().get_visible_rect().size)
 
 
-func _build() -> void:
-	for child in get_children():
-		if child != _closet:
-			child.queue_free()
-	_main_margin = null
-
-	var night := ColorRect.new()
-	night.color = Color(0.05, 0.04, 0.08, 1.0)
-	night.anchors_preset = Control.PRESET_FULL_RECT
-	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(night)
-
-	_main_margin = MarginContainer.new()
-	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
-	SafeArea.apply_safe_padding(_main_margin, get_viewport())
-	add_child(_main_margin)
-
-	var root := VBoxContainer.new()
-	root.alignment = BoxContainer.ALIGNMENT_CENTER
-	root.add_theme_constant_override("separation", 12)
-	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_main_margin.add_child(root)
-
+func _fill() -> void:
 	# Title
 	var title := UiFont.label("キャラクター選択", 32, UiFont.PAPER)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.add_child(title)
+	_main_container.add_child(title)
 
 	# Character list
 	if _is_portrait:
@@ -104,7 +107,7 @@ func _build() -> void:
 		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		root.add_child(scroll)
+		_main_container.add_child(scroll)
 
 		var content := VBoxContainer.new()
 		content.add_theme_constant_override("separation", 12)
@@ -128,7 +131,7 @@ func _build() -> void:
 		center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		root.add_child(center)
+		_main_container.add_child(center)
 
 		var row := HBoxContainer.new()
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -148,7 +151,7 @@ func _build() -> void:
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/title.tscn")
 	)
-	root.add_child(back)
+	_main_container.add_child(back)
 
 
 func _card(who: String) -> Control:
