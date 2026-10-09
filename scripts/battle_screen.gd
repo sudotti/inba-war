@@ -70,6 +70,15 @@ var _face: Dictionary = {}
 var _flash: Dictionary = {}
 var _bite: Dictionary = {}
 var _puffs: Array[Dictionary] = []
+var special_button: Button
+var special_gauge: ProgressBar
+var _special_cut_in: Control
+var _special_face: TextureRect
+var _special_name: Label
+var _special_quote: Label
+var _special_seen := 0
+var _special_ring_left := 0.0
+var _special_tween: Tween
 
 
 func _ready() -> void:
@@ -91,6 +100,7 @@ func _ready() -> void:
 
 
 func _process(dt: float) -> void:
+	_special_ring_left = maxf(0.0, _special_ring_left - dt)
 	if sim.finished:
 		_go_result()
 		return
@@ -135,13 +145,15 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if _touch_count == 0:
 			_mouse_down = event.pressed
-	elif event is InputEventKey and event.pressed and not event.echo and sim != null and sim.build_open:
+	elif event is InputEventKey and event.pressed and not event.echo and sim != null:
 		var key := int(event.physical_keycode)
-		if key == KEY_1 or key == KEY_KP_1:
+		if key == KEY_SPACE and not sim.build_open:
+			_activate_special()
+		elif sim.build_open and (key == KEY_1 or key == KEY_KP_1):
 			_pick(0)
-		elif key == KEY_2 or key == KEY_KP_2:
+		elif sim.build_open and (key == KEY_2 or key == KEY_KP_2):
 			_pick(1)
-		elif key == KEY_3 or key == KEY_KP_3:
+		elif sim.build_open and (key == KEY_3 or key == KEY_KP_3):
 			_pick(2)
 
 
@@ -265,6 +277,12 @@ func _burst(spot: Vector2, kind: String) -> void:
 
 func _draw() -> void:
 	_draw_ground()
+	if _special_ring_left > 0.0:
+		var progress := 1.0 - _special_ring_left / 0.58
+		var start := -PI * 0.5 + progress * TAU
+		var radius := lerpf(84.0, Balance.SPECIAL_MASSA_RADIUS, progress)
+		draw_arc(sim.player_pos, radius, start, start + TAU * 0.82, 96, Color(1.0, 0.84, 0.3, 0.9 * (1.0 - progress * 0.45)), 14.0, true)
+		draw_arc(sim.player_pos, radius - 12.0, start, start + TAU * 0.72, 80, Color(1.0, 0.97, 0.78, 0.7 * (1.0 - progress)), 4.0, true)
 	var shadow_r := 32.0 if str(sim.character_id) == Balance.CHAR_TAKETCHI else 24.0
 	_draw_shadow(sim.player_pos, shadow_r * (1.0 if _strike_age > 0.2 else 0.82))
 	for cone in sim.cones:
@@ -726,6 +744,7 @@ func _sync_hud() -> void:
 	score_label.text = "スコア  %d" % sim.score
 	coin_label.text = "コイン  %d" % sim.shown_coins()
 	build_line.text = _owned_builds()
+	_update_special_hud()
 	if sim.time > 5.0:
 		hint.modulate.a = clampf(1.0 - (sim.time - 5.0) / 1.2, 0.0, 1.0)
 
@@ -843,6 +862,24 @@ func _build_hud() -> void:
 	UiFont.place(_gain, 0.18, 0.40, 0.82, 0.52)
 	root.add_child(_gain)
 
+	var special_box := VBoxContainer.new()
+	special_box.add_theme_constant_override("separation", 4)
+	UiFont.place(special_box, 0.80, 0.72, 0.98, 0.91)
+	root.add_child(special_box)
+	special_gauge = ProgressBar.new()
+	special_gauge.min_value = 0.0
+	special_gauge.max_value = Balance.SPECIAL_GAUGE_MAX
+	special_gauge.show_percentage = false
+	special_gauge.custom_minimum_size = Vector2(0, 14)
+	special_gauge.add_theme_stylebox_override("background", UiFont.style(Color(0.05, 0.05, 0.05, 0.88), Color("c8a456"), 2, 7))
+	special_gauge.add_theme_stylebox_override("fill", UiFont.style(Color("d7b072"), Color("fff0c2"), 1, 6))
+	special_box.add_child(special_gauge)
+	special_button = UiFont.button("必殺技 0% [Space]", 18)
+	special_button.custom_minimum_size = Vector2(0, 64)
+	special_button.pressed.connect(_activate_special)
+	special_box.add_child(special_button)
+	_build_special_cut_in()
+
 
 func _build_stick() -> void:
 	var layer := CanvasLayer.new()
@@ -855,6 +892,99 @@ func _build_stick() -> void:
 	stick = Stick.new()
 	root.add_child(stick)
 	UiFont.place(stick, 0.0, 0.0, 0.46, 1.0)
+
+
+func _build_special_cut_in() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 16
+	add_child(layer)
+	_special_cut_in = Control.new()
+	_special_cut_in.visible = false
+	_special_cut_in.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(_special_cut_in)
+	layer.add_child(_special_cut_in)
+	var dim := ColorRect.new()
+	dim.color = Color(0.02, 0.02, 0.03, 0.42)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(dim)
+	_special_cut_in.add_child(dim)
+	var band := PanelContainer.new()
+	UiFont.place(band, 0.035, 0.31, 0.965, 0.69)
+	band.add_theme_stylebox_override("panel", UiFont.style(Color("17130f"), Color("e6bd62"), 5, 4))
+	_special_cut_in.add_child(band)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 24)
+	band.add_child(row)
+	_special_face = TextureRect.new()
+	_special_face.custom_minimum_size = Vector2(172, 0)
+	_special_face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_special_face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_special_face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_special_face)
+	var copy := VBoxContainer.new()
+	copy.alignment = BoxContainer.ALIGNMENT_CENTER
+	copy.add_theme_constant_override("separation", 8)
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(copy)
+	_special_name = UiFont.label("", 28, UiFont.BRASS)
+	_special_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	copy.add_child(_special_name)
+	_special_quote = UiFont.label("", 34, UiFont.PAPER)
+	_special_quote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_special_quote.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	copy.add_child(_special_quote)
+
+
+func _activate_special() -> void:
+	if sim == null or not sim.activate_special():
+		return
+	_special_seen = sim.special_serial
+	_special_face.texture = _face_texture()
+	_special_name.text = "%s  必殺技" % _who
+	_special_quote.text = str(Balance.SPECIAL_QUOTES[_who])
+	_special_cut_in.visible = true
+	_special_cut_in.modulate.a = 0.0
+	_special_cut_in.scale = Vector2(0.94, 0.94)
+	_special_cut_in.pivot_offset = get_viewport_rect().size * 0.5
+	if _special_tween != null and _special_tween.is_running():
+		_special_tween.kill()
+	_special_tween = create_tween()
+	_special_tween.tween_property(_special_cut_in, "modulate:a", 1.0, 0.14)
+	_special_tween.parallel().tween_property(_special_cut_in, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_special_tween.tween_interval(1.35)
+	_special_tween.tween_property(_special_cut_in, "modulate:a", 0.0, 0.24)
+	_special_tween.tween_callback(func() -> void: _special_cut_in.visible = false)
+	if _who == Balance.CHAR_MASSA:
+		_special_ring_left = 0.58
+		_shake_left = 0.28
+	_update_special_hud()
+	queue_redraw()
+
+
+func _update_special_hud() -> void:
+	if sim == null or special_button == null:
+		return
+	special_gauge.value = sim.special_charge
+	var percent := int(roundf(sim.special_charge))
+	if sim.special_active_left > 0.0:
+		special_button.text = "必殺技  %.1f秒" % sim.special_active_left
+	elif sim.special_charge >= Balance.SPECIAL_GAUGE_MAX:
+		special_button.text = "必殺技 発動 [Space]"
+	else:
+		special_button.text = "必殺技 %d%% [Space]" % percent
+	special_button.disabled = not sim.can_activate_special()
+	if special_button.disabled:
+		special_button.modulate = Color(0.72, 0.72, 0.72, 0.88)
+	else:
+		special_button.modulate = Color.WHITE
+
+
+func _face_texture() -> Texture2D:
+	var portrait := UiFont.cropped(_portrait_path(_who))
+	var face := AtlasTexture.new()
+	face.atlas = portrait
+	face.region = Rect2(portrait.get_width() * 0.12, 0.0, portrait.get_width() * 0.76, portrait.get_height() * 0.4)
+	return face
 
 
 func _build_choice() -> void:

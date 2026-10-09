@@ -40,6 +40,9 @@ var _base_radius: float = 136.0
 var base_attack: int = 14
 var base_knockback: float = 180.0
 var damage_taken_scale: float = 1.0
+var special_charge: float = 0.0
+var special_active_left: float = 0.0
+var special_serial: int = 0
 
 var enemies: Array[Actor] = []
 var coins: Array[Coin] = []
@@ -118,9 +121,49 @@ func speed_now() -> float:
 
 
 func attack_ratio() -> float:
-	if attack_interval <= 0.0:
+	var interval := attack_interval_now()
+	if interval <= 0.0:
 		return 0.0
-	return clampf(_attack_acc / attack_interval, 0.0, 1.0)
+	return clampf(_attack_acc / interval, 0.0, 1.0)
+
+
+func attack_interval_now() -> float:
+	if special_active_left > 0.0:
+		if character_id == Balance.CHAR_TAKETCHI:
+			return maxf(0.2, attack_interval * Balance.SPECIAL_TAKETCHI_ATTACK_SCALE)
+		if character_id == Balance.CHAR_KENNY:
+			return Balance.SPECIAL_KENNY_ATTACK_INTERVAL
+	return attack_interval
+
+
+func attack_damage_now() -> int:
+	var damage := Balance.attack_damage(base_attack, int(levels[Balance.BUTTO]))
+	if special_active_left > 0.0 and character_id == Balance.CHAR_TAKETCHI:
+		damage = floori(float(damage) * Balance.SPECIAL_TAKETCHI_DAMAGE_SCALE)
+	return damage
+
+
+func can_activate_special() -> bool:
+	return (
+		not finished
+		and not build_open
+		and special_charge >= Balance.SPECIAL_GAUGE_MAX
+		and special_active_left <= 0.0
+	)
+
+
+func activate_special() -> bool:
+	if not can_activate_special():
+		return false
+	special_charge = 0.0
+	special_serial += 1
+	if character_id == Balance.CHAR_MASSA:
+		_special_sweep()
+	elif character_id == Balance.CHAR_TAKETCHI:
+		special_active_left = Balance.SPECIAL_TAKETCHI_SECONDS
+	else:
+		special_active_left = Balance.SPECIAL_KENNY_SECONDS
+	return true
 
 
 func step(dt: float, move_dir: Vector2) -> void:
@@ -141,6 +184,7 @@ func _step_slice(dt: float, move_dir: Vector2) -> void:
 	_move_enemies(dt)
 	_move_coins(dt)
 	_attacks(dt)
+	special_active_left = maxf(0.0, special_active_left - dt)
 	if finished:
 		return
 	_puritora(dt)
@@ -268,16 +312,16 @@ func _collect_coin() -> void:
 func _attacks(dt: float) -> void:
 	_attack_acc += dt
 	var guard := 0
-	while _attack_acc >= attack_interval and not finished and guard < 32:
+	while _attack_acc >= attack_interval_now() and not finished and guard < 32:
 		guard += 1
-		_attack_acc -= attack_interval
+		_attack_acc -= attack_interval_now()
 		if attacks_enabled:
 			_attack()
 
 
 func _attack() -> void:
 	attack_serial += 1
-	var damage := Balance.attack_damage(base_attack, int(levels[Balance.BUTTO]))
+	var damage := attack_damage_now()
 	var blast := base_knockback * (1.0 + 0.15 * float(levels[Balance.BUTTO]))
 	var reached: Array[Actor] = []
 	for actor in enemies:
@@ -291,6 +335,23 @@ func _attack() -> void:
 			dead.append(actor)
 		elif actor.stun <= 0.0:
 			_knockback(actor, blast)
+	for actor in dead:
+		_kill(actor)
+
+
+func _special_sweep() -> void:
+	var damage := floori(float(attack_damage_now()) * Balance.SPECIAL_MASSA_DAMAGE_SCALE)
+	var reached: Array[Actor] = []
+	for actor in enemies:
+		if player_pos.distance_to(actor.pos) <= Balance.SPECIAL_MASSA_RADIUS:
+			reached.append(actor)
+	var dead: Array[Actor] = []
+	for actor in reached:
+		actor.hp -= damage
+		if actor.hp <= 0:
+			dead.append(actor)
+		elif actor.stun <= 0.0:
+			_knockback(actor, Balance.SPECIAL_MASSA_KNOCKBACK)
 	for actor in dead:
 		_kill(actor)
 
@@ -496,6 +557,10 @@ func _kill(actor: Actor) -> void:
 
 func _register_kill(kind: String) -> void:
 	kills += 1
+	special_charge = minf(
+		Balance.SPECIAL_GAUGE_MAX,
+		special_charge + Balance.SPECIAL_CHARGE_PER_KILL
+	)
 	kills_of[kind] = int(kills_of[kind]) + 1
 	score += int(Balance.SCORE[kind])
 	var megumi_level := int(levels[Balance.MEGUMI])

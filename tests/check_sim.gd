@@ -11,6 +11,7 @@ func _initialize() -> void:
 	_balance()
 	_names()
 	_combat()
+	_specials()
 	_spawn_and_round()
 	_save()
 	_shop()
@@ -81,6 +82,38 @@ func _names() -> void:
 	_true(not Balance.is_valid_display_name(""), "empty invalid")
 	_true(not Balance.is_valid_display_name("massa!"), "symbol")
 	_true(not Balance.is_valid_display_name("ま さ"), "space")
+
+
+func _specials() -> void:
+	var sim = BattleSim.new()
+	sim.spawns_enabled = false
+	sim.contact_enabled = false
+	sim.debug_count_kills(Balance.KIND_NORMAL, 5)
+	_eq(sim.special_charge, 50.0, "special charge per kill")
+	_true(not sim.activate_special(), "special requires full charge")
+	sim.special_charge = Balance.SPECIAL_GAUGE_MAX
+	var target = sim.debug_place(Balance.KIND_NORMAL, sim.player_pos + Vector2(300, 0), 100, 0.0)
+	_true(sim.activate_special(), "massa special activates")
+	_eq(target.hp, 58, "massa wide sweep damage")
+	_true(target.pos.distance_to(sim.player_pos) > 300.0, "massa special knockback")
+	_eq(sim.special_charge, 0.0, "special consumes charge")
+
+	sim = BattleSim.new(Balance.CHAR_TAKETCHI)
+	sim.special_charge = Balance.SPECIAL_GAUGE_MAX
+	_true(sim.activate_special(), "takechi special activates")
+	_near(sim.attack_interval_now(), 0.31, "takechi special attack speed")
+	_eq(sim.attack_damage_now(), 46, "takechi special attack damage")
+	_near(sim.special_active_left, 8.0, "takechi special duration")
+
+	sim = BattleSim.new(Balance.CHAR_KENNY)
+	sim.special_charge = Balance.SPECIAL_GAUGE_MAX
+	_true(sim.activate_special(), "kenny special activates")
+	_near(sim.attack_interval_now(), 0.12, "kenny special attack count")
+	_near(sim.special_active_left, 6.0, "kenny special duration")
+	sim.spawns_enabled = false
+	sim.contact_enabled = false
+	sim.step(0.2, Vector2.ZERO)
+	_near(sim.special_active_left, 5.8, "special timer ticks")
 
 
 func _combat() -> void:

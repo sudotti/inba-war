@@ -5,3 +5,4 @@ export.cfg
 *.tmp
 *.bak
 /build/
+/docs/*.import
