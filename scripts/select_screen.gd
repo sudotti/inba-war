@@ -86,11 +86,13 @@ func _build() -> void:
 		content.add_theme_constant_override("separation", 12)
 		content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		scroll.add_child(content)
 
 		for who in ORDER:
 			var card = _card(who)
 			card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			content.add_child(card)
 
 		var spacer := Control.new()
@@ -156,7 +158,6 @@ func _card(who: String) -> Control:
 		picture.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		UiFont.full_rect(picture)
 		col.add_child(picture)
 		_pictures[who] = picture
 
@@ -191,7 +192,6 @@ func _portrait_picture(who: String) -> TextureRect:
 	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	picture.custom_minimum_size = Vector2(140, 140)
 	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(picture)
 	_pictures[who] = picture
 	return picture
 
