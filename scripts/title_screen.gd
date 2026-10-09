@@ -39,21 +39,53 @@ func _build_background() -> void:
 	var bg := ColorRect.new()
 	bg.color = Color(0.02, 0.02, 0.04, 1.0)
 	bg.anchors_preset = Control.PRESET_FULL_RECT
+	UiFont.full_rect(bg)
 	add_child(bg)
+
+	# Hero image as full-screen background
+	var hero_texture := load(HERO)
+	var hero_image := TextureRect.new()
+	hero_image.texture = hero_texture
+	hero_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hero_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	hero_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(hero_image)
+	hero_image.modulate = Color(1, 1, 1, 0.35)
+	add_child(hero_image)
+
+	# Gradient fade at bottom
+	var grad := Gradient.new()
+	grad.add_point(0.0, Color(0, 0, 0, 0.0))
+	grad.add_point(0.55, Color(0, 0, 0, 0.0))
+	grad.add_point(0.75, Color(0, 0, 0, 0.25))
+	grad.add_point(1.0, Color(0, 0, 0, 0.95))
+	var grad_tex := GradientTexture1D.new()
+	grad_tex.gradient = grad
+	grad_tex.width = 512
+	var fade := TextureRect.new()
+	fade.texture = grad_tex
+	fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	fade.stretch_mode = TextureRect.STRETCH_SCALE
+	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(fade)
+	add_child(fade)
 
 
 func _build_content() -> void:
 	_main_margin = MarginContainer.new()
 	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
+	UiFont.full_rect(_main_margin)
 	SafeArea.apply_safe_padding(_main_margin, get_viewport())
 	add_child(_main_margin)
 
 	var root := VBoxContainer.new()
 	root.alignment = BoxContainer.ALIGNMENT_CENTER
 	root.add_theme_constant_override("separation", 12)
+	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.custom_minimum_size = Vector2(0, 400)
 	_main_margin.add_child(root)
 
-	# Top bar
 	var top_bar := HBoxContainer.new()
 	top_bar.alignment = BoxContainer.ALIGNMENT_CENTER
 	top_bar.add_theme_constant_override("separation", 12)
@@ -75,38 +107,10 @@ func _build_content() -> void:
 	yen_pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	top_bar.add_child(yen_pill)
 
-	# Hero area - expands to fill
-	var hero_frame := Control.new()
-	hero_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hero_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	hero_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.add_child(hero_frame)
-
-	var hero_texture := load(HERO)
-	var hero_image := TextureRect.new()
-	hero_image.texture = hero_texture
-	hero_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	hero_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	hero_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hero_image.anchors_preset = Control.PRESET_FULL_RECT
-	hero_frame.add_child(hero_image)
-
-	# Gradient fade at bottom
-	var grad := Gradient.new()
-	grad.add_point(0.0, Color(0, 0, 0, 0.0))
-	grad.add_point(0.55, Color(0, 0, 0, 0.0))
-	grad.add_point(0.75, Color(0, 0, 0, 0.25))
-	grad.add_point(1.0, Color(0, 0, 0, 0.95))
-	var grad_tex := GradientTexture1D.new()
-	grad_tex.gradient = grad
-	grad_tex.width = 512
-	var fade := TextureRect.new()
-	fade.texture = grad_tex
-	fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	fade.stretch_mode = TextureRect.STRETCH_SCALE
-	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fade.anchors_preset = Control.PRESET_FULL_RECT
-	hero_frame.add_child(fade)
+	# Spacer to push content to center
+	var v_spacer_top := Control.new()
+	v_spacer_top.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(v_spacer_top)
 
 	# Main sortie button
 	var main_btn := _make_main_button()
@@ -133,6 +137,11 @@ func _build_content() -> void:
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.custom_minimum_size = Vector2(0, 56)
 		grid.add_child(btn)
+
+	# Bottom spacer
+	var v_spacer_bottom := Control.new()
+	v_spacer_bottom.custom_minimum_size = Vector2(0, 24)
+	root.add_child(v_spacer_bottom)
 
 
 func _make_pill(text: String) -> Panel:

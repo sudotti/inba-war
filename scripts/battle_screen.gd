@@ -4,6 +4,7 @@ const Balance = preload("res://scripts/balance.gd")
 const BattleSim = preload("res://scripts/battle_sim.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
 const Stick = preload("res://scripts/virtual_stick.gd")
+const SafeArea = preload("res://scripts/safe_area.gd")
 
 const GRASS := Color("2c3b28")
 const GRASS_DARK := Color("243222")
@@ -99,6 +100,11 @@ var _seen_boss_alert := 0
 var _compact_layout := false
 var _stacked_cards := false
 var _stacked_card_h := 150.0
+var _is_portrait := false
+var _hud_margin: MarginContainer
+var _boss_margin: MarginContainer
+var _ui_margin: MarginContainer
+var _special_margin: MarginContainer
 
 
 func _ready() -> void:
@@ -1011,16 +1017,28 @@ func _build_hud() -> void:
 	layer.add_child(root)
 	UiFont.full_rect(root)
 
+	_hud_margin = MarginContainer.new()
+	_hud_margin.anchors_preset = Control.PRESET_FULL_RECT
+	SafeArea.apply_safe_padding(_hud_margin, get_viewport())
+	root.add_child(_hud_margin)
+
+	var main_col := VBoxContainer.new()
+	main_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main_col.add_theme_constant_override("separation", 8)
+	main_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_hud_margin.add_child(main_col)
+
+	# Top bar
 	var bar := PanelContainer.new()
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(bar, 0.02, 0.012, 0.98, 0.10)
 	var hud_style := UiFont.style(Color(0.07, 0.08, 0.1, 0.94), Color(1, 0.95, 0.82, 0.7), 3, 18)
 	hud_style.content_margin_top = 4 if _compact_layout else 6
 	hud_style.content_margin_bottom = 4 if _compact_layout else 6
 	hud_style.content_margin_left = 14
 	hud_style.content_margin_right = 14
 	bar.add_theme_stylebox_override("panel", hud_style)
-	root.add_child(bar)
+	main_col.add_child(bar)
 
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1097,6 +1115,12 @@ func _build_hud() -> void:
 		row.add_child(score_label)
 		row.add_child(coin_label)
 
+	# Spacer to push bottom elements down
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_col.add_child(spacer)
+
+	# Hint at bottom
 	var motion := "鉄パイプ  広範囲攻撃"
 	if _who == Balance.CHAR_TAKETCHI:
 		motion = "拳  近距離・高威力"
@@ -1104,26 +1128,24 @@ func _build_hud() -> void:
 		motion = "キック  高速移動"
 	hint = UiFont.label(motion, 18, Color(1, 1, 1, 0.94))
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(hint, 0.26, 0.915, 0.74, 0.975)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	root.add_child(hint)
+	main_col.add_child(hint)
 
 	build_line = UiFont.label("", 18, UiFont.YELLOW)
 	build_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	build_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UiFont.place(build_line, 0.12, 0.855, 0.88, 0.91)
-	root.add_child(build_line)
+	main_col.add_child(build_line)
 
+	# Gain label (centered overlay)
 	_gain = UiFont.label("", 40, UiFont.YELLOW)
 	_gain.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_gain.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_gain.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_gain.modulate.a = 0.0
-	UiFont.place(_gain, 0.18, 0.40, 0.82, 0.52)
+	UiFont.full_rect(_gain)
 	root.add_child(_gain)
 
-	var special_box := VBoxContainer.new()
-	special_box.add_theme_constant_override("separation", 4)
-	UiFont.place(special_box, 0.76 if _compact_layout else 0.80, 0.70 if _compact_layout else 0.72, 0.98, 0.94 if _compact_layout else 0.91)
+	# Special gauge and button (bottom right)
 	var ui_layer := CanvasLayer.new()
 	ui_layer.layer = 6
 	add_child(ui_layer)
@@ -1131,19 +1153,32 @@ func _build_hud() -> void:
 	ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_layer.add_child(ui_root)
 	UiFont.full_rect(ui_root)
-	ui_root.add_child(special_box)
+
+	var special_margin := MarginContainer.new()
+	special_margin.anchors_preset = Control.PRESET_FULL_RECT
+	SafeArea.apply_safe_padding(special_margin, get_viewport())
+	ui_root.add_child(special_margin)
+
+	var special_box := VBoxContainer.new()
+	special_box.add_theme_constant_override("separation", 4)
+	special_box.alignment = BoxContainer.ALIGNMENT_END
+	special_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	special_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	special_margin.add_child(special_box)
+
 	var home := UiFont.button("ホーム", 14 if _compact_layout else 16)
 	home.custom_minimum_size = Vector2(0, 40 if _compact_layout else 48)
-	UiFont.place(home, 0.80 if _compact_layout else 0.84, 0.108, 0.97, 0.16)
+	home.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	home.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/title.tscn")
 	)
-	ui_root.add_child(home)
+	special_box.add_child(home)
+
 	special_gauge = ProgressBar.new()
 	special_gauge.min_value = 0.0
 	special_gauge.max_value = Balance.SPECIAL_GAUGE_MAX
 	special_gauge.show_percentage = false
-	special_gauge.custom_minimum_size = Vector2(0, 14)
+	special_gauge.custom_minimum_size = Vector2(200, 14)
 	special_gauge.add_theme_stylebox_override("background", UiFont.style(Color(0.05, 0.05, 0.05, 0.88), Color("c8a456"), 2, 7))
 	special_gauge.add_theme_stylebox_override("fill", UiFont.style(Color("d7b072"), Color("fff0c2"), 1, 6))
 	special_box.add_child(special_gauge)
@@ -1178,15 +1213,29 @@ func _build_special_cut_in() -> void:
 	_special_cut_in.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.full_rect(_special_cut_in)
 	layer.add_child(_special_cut_in)
+
+	_special_margin = MarginContainer.new()
+	_special_margin.anchors_preset = Control.PRESET_FULL_RECT
+	SafeArea.apply_safe_padding(_special_margin, get_viewport())
+	_special_cut_in.add_child(_special_margin)
+
 	var dim := ColorRect.new()
 	dim.color = Color(0.02, 0.02, 0.03, 0.42)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.full_rect(dim)
 	_special_cut_in.add_child(dim)
+
 	var band := PanelContainer.new()
-	UiFont.place(band, 0.035, 0.31, 0.965, 0.69)
-	band.add_theme_stylebox_override("panel", UiFont.style(Color("17130f"), Color("e6bd62"), 5, 4))
-	_special_cut_in.add_child(band)
+	band.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	band.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var band_style := UiFont.style(Color("17130f"), Color("e6bd62"), 5, 4)
+	band_style.content_margin_top = 24
+	band_style.content_margin_bottom = 24
+	band_style.content_margin_left = 32
+	band_style.content_margin_right = 32
+	band.add_theme_stylebox_override("panel", band_style)
+	_special_margin.add_child(band)
+
 	var flash_layer := CanvasLayer.new()
 	flash_layer.layer = 17
 	add_child(flash_layer)
@@ -1196,8 +1245,10 @@ func _build_special_cut_in() -> void:
 	_special_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.full_rect(_special_flash)
 	flash_layer.add_child(_special_flash)
+
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 24)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	band.add_child(row)
 	_special_face = TextureRect.new()
 	_special_face.custom_minimum_size = Vector2(172, 0)
@@ -1310,12 +1361,32 @@ func _build_boss_hud() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
 	UiFont.full_rect(root)
+
+	_boss_margin = MarginContainer.new()
+	_boss_margin.anchors_preset = Control.PRESET_FULL_RECT
+	SafeArea.apply_safe_padding(_boss_margin, get_viewport())
+	root.add_child(_boss_margin)
+
+	var main_col := VBoxContainer.new()
+	main_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	main_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_boss_margin.add_child(main_col)
+
+	# Boss HP panel at top
 	_boss_panel = PanelContainer.new()
 	_boss_panel.visible = false
 	_boss_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(_boss_panel, 0.31, 0.105, 0.69, 0.19)
-	_boss_panel.add_theme_stylebox_override("panel", UiFont.style(Color("17130f"), Color("dc5946"), 3, 5))
-	root.add_child(_boss_panel)
+	_boss_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var boss_panel_style := UiFont.style(Color("17130f"), Color("dc5946"), 3, 5)
+	boss_panel_style.content_margin_top = 8
+	boss_panel_style.content_margin_bottom = 8
+	boss_panel_style.content_margin_left = 16
+	boss_panel_style.content_margin_right = 16
+	_boss_panel.add_theme_stylebox_override("panel", boss_panel_style)
+	main_col.add_child(_boss_panel)
+
 	var boss_col := VBoxContainer.new()
 	boss_col.add_theme_constant_override("separation", 3)
 	_boss_panel.add_child(boss_col)
@@ -1330,15 +1401,28 @@ func _build_boss_hud() -> void:
 	_boss_hp.add_theme_stylebox_override("background", UiFont.style(Color("28201d"), Color("754339"), 1, 4))
 	_boss_hp.add_theme_stylebox_override("fill", UiFont.style(Color("e34c39"), Color("ffb55a"), 1, 3))
 	boss_col.add_child(_boss_hp)
+
+	# Spacer
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_col.add_child(spacer)
+
+	# Boss banner at center
 	_boss_banner = PanelContainer.new()
 	_boss_banner.visible = false
 	_boss_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_boss_banner.pivot_offset = Vector2(640, 180)
-	UiFont.place(_boss_banner, 0.22, 0.2, 0.78, 0.52)
-	_boss_banner.add_theme_stylebox_override("panel", UiFont.style(Color("15120f"), Color("e0a448"), 5, 6))
-	root.add_child(_boss_banner)
+	var banner_style := UiFont.style(Color("15120f"), Color("e0a448"), 5, 6)
+	banner_style.content_margin_top = 24
+	banner_style.content_margin_bottom = 24
+	banner_style.content_margin_left = 32
+	banner_style.content_margin_right = 32
+	_boss_banner.add_theme_stylebox_override("panel", banner_style)
+	main_col.add_child(_boss_banner)
+
 	var banner_row := HBoxContainer.new()
 	banner_row.add_theme_constant_override("separation", 20)
+	banner_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_boss_banner.add_child(banner_row)
 	_boss_banner_image = TextureRect.new()
 	_boss_banner_image.custom_minimum_size = Vector2(150, 150)
@@ -1356,6 +1440,7 @@ func _build_boss_hud() -> void:
 	_boss_banner_action = UiFont.label("", 22, UiFont.BRASS)
 	_boss_banner_action.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	banner_copy.add_child(_boss_banner_action)
+
 	_seen_boss_alert = sim.boss_alert_serial
 
 
@@ -1423,12 +1508,18 @@ func _build_choice() -> void:
 	UiFont.full_rect(dim)
 	build_root.add_child(dim)
 
+	var choice_margin = MarginContainer.new()
+	choice_margin.anchors_preset = Control.PRESET_FULL_RECT
+	SafeArea.apply_safe_padding(choice_margin, get_viewport())
+	build_root.add_child(choice_margin)
+
 	var col := VBoxContainer.new()
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(col, 0.06, 0.12, 0.94, 0.90)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 16)
-	build_root.add_child(col)
+	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	choice_margin.add_child(col)
 
 	var heading := UiFont.label("強化選択", 32 if _compact_layout else 40, UiFont.PAPER)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1448,6 +1539,7 @@ func _build_choice() -> void:
 	card_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	card_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_child(card_row)
 
 	timer_label = UiFont.label("20.0", 24, UiFont.PAPER)

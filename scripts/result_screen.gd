@@ -53,6 +53,8 @@ func _build() -> void:
 	var root := VBoxContainer.new()
 	root.alignment = BoxContainer.ALIGNMENT_CENTER
 	root.add_theme_constant_override("separation", 12)
+	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_main_margin.add_child(root)
 
 	# Character portrait on the side
