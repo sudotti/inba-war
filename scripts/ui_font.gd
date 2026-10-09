@@ -38,10 +38,7 @@ static func cropped(path: String) -> Texture2D:
 
 static func font() -> Font:
 	if _font == null:
-		var variation := FontVariation.new()
-		variation.base_font = load(FONT_PATH)
-		variation.variation_opentype = {&"wght": 700.0}
-		_font = variation
+		_font = load(FONT_PATH)
 	return _font
 
 
