@@ -72,9 +72,8 @@ func _refill() -> void:
 	for child in _main_container.get_children():
 		_main_container.remove_child(child)
 		child.queue_free()
-	# Wait one frame for queue_free to complete
-	await get_tree().process_frame
-	_fill()
+	# Use call_deferred to avoid issues with await in debug mode
+	call_deferred("_fill")
 
 
 func _portrait_now() -> bool:
@@ -112,10 +111,8 @@ func _fill() -> void:
 		var content := VBoxContainer.new()
 		content.add_theme_constant_override("separation", 12)
 		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		content.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		scroll.add_child(content)
-		scroll.resized.connect(func() -> void:
-			content.custom_minimum_size.x = scroll.size.x
-		)
 		content.custom_minimum_size.x = 360
 
 		for who in ORDER:
