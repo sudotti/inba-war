@@ -34,25 +34,30 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
-	var center := CenterContainer.new()
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(center, 0.04, 0.14, 0.96, 0.84)
-	add_child(center)
-
 	if _is_portrait:
 		var scroll := ReverseScrollContainer.new()
 		scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_ENABLED
-		center.add_child(scroll)
-		var list := VBoxContainer.new()
-		list.add_theme_constant_override("separation", 10)
-		list.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		list.custom_minimum_size = Vector2(0, 1)
-		scroll.add_child(list)
+		UiFont.place(scroll, 0.04, 0.14, 0.96, 0.84)
+		add_child(scroll)
+		var content := VBoxContainer.new()
+		content.add_theme_constant_override("separation", 10)
+		content.alignment = BoxContainer.ALIGNMENT_CENTER
+		content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		content.custom_minimum_size = Vector2(0, 1)
+		scroll.add_child(content)
 		for who in ORDER:
-			list.add_child(_card(who))
+			content.add_child(_card(who))
+		var spacer := Control.new()
+		spacer.custom_minimum_size = Vector2(0, 100)
+		content.add_child(spacer)
 	else:
+		var center := CenterContainer.new()
+		center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		UiFont.place(center, 0.04, 0.14, 0.96, 0.84)
+		add_child(center)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 18)
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
