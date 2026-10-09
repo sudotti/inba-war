@@ -8,12 +8,17 @@ const POSTER := "res://assets/ui/title_trio.png"
 var _lights: Array[Dictionary] = []
 var _t := 0.0
 var _portrait := false
+var _name_panel: Control
+var _name_edit: LineEdit
+var _name_hint: Label
 
 
 func _ready() -> void:
 	get_viewport().size_changed.connect(_on_resized)
 	_portrait = UiFont.portrait(get_viewport_rect().size)
 	_build()
+	if SaveStore.shown_name() == "":
+		_open_name_entry()
 
 
 func _process(dt: float) -> void:
@@ -31,6 +36,9 @@ func _on_resized() -> void:
 func _build() -> void:
 	for child in get_children():
 		child.queue_free()
+	_name_panel = null
+	_name_edit = null
+	_name_hint = null
 	_seed_lights()
 	_build_background()
 	_build_fx()
@@ -142,9 +150,11 @@ func _build_title_landscape() -> void:
 	panel.add_child(col)
 	var title := UiFont.label(Balance.TITLE, 58, UiFont.GOLD)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(title)
 	var subtitle := UiFont.label("校庭に、三分の決戦。", 21, UiFont.CREAM)
 	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(subtitle)
 
 
@@ -161,9 +171,11 @@ func _build_title_portrait() -> void:
 	panel.add_child(col)
 	var title := UiFont.label(Balance.TITLE, 40, UiFont.GOLD)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(title)
 	var subtitle := UiFont.label("校庭に、三分の決戦。", 16, UiFont.CREAM)
 	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(subtitle)
 
 
@@ -173,19 +185,133 @@ func _build_stats(top: float, bottom: float) -> void:
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.place(band, 0.24 if not _portrait else 0.12, top, 0.76 if not _portrait else 0.88, bottom)
 	add_child(band)
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 48 if not _portrait else 24)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(row)
-	band.add_child(row)
+	var body: Control
+	if _portrait:
+		var col := VBoxContainer.new()
+		col.alignment = BoxContainer.ALIGNMENT_CENTER
+		col.add_theme_constant_override("separation", 2)
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		UiFont.full_rect(col)
+		body = col
+	else:
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 48)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		UiFont.full_rect(row)
+		body = row
+	band.add_child(body)
+	var name_button := _name_button()
+	body.add_child(name_button)
 	var best := int(SaveStore.data.get("best_score", 0))
 	var when := str(SaveStore.data.get("best_datetime", ""))
 	var best_text := "自己ベスト  記録なし" if when == "" else "自己ベスト  %d" % best
 	var size := 22 if not _portrait else 18
-	row.add_child(UiFont.label(best_text, size, UiFont.PAPER))
+	var best_label := UiFont.label(best_text, size, UiFont.PAPER)
+	best_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_child(best_label)
 	var yen := int(SaveStore.data.get("yen", 0))
-	row.add_child(UiFont.label("所持金  %d イェン" % yen, size, UiFont.GOLD))
+	var yen_label := UiFont.label("所持金  %d イェン" % yen, size, UiFont.GOLD)
+	yen_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_child(yen_label)
+
+
+func _name_button() -> Button:
+	var node := Button.new()
+	node.text = "プレイヤー  %s" % SaveStore.shown_name()
+	node.add_theme_font_override("font", UiFont.font())
+	node.add_theme_font_size_override("font_size", 18 if _portrait else 20)
+	node.add_theme_color_override("font_color", UiFont.CREAM)
+	node.add_theme_color_override("font_hover_color", UiFont.GOLD)
+	node.add_theme_color_override("font_pressed_color", UiFont.GOLD)
+	node.add_theme_color_override("font_focus_color", UiFont.CREAM)
+	node.add_theme_color_override("font_disabled_color", UiFont.CREAM)
+	var empty := StyleBoxEmpty.new()
+	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+		node.add_theme_stylebox_override(state, empty)
+	node.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	node.mouse_filter = Control.MOUSE_FILTER_STOP
+	node.pressed.connect(_open_name_entry)
+	return node
+
+
+func _open_name_entry() -> void:
+	if _name_panel != null:
+		_name_panel.visible = true
+		return
+	var overlay := Control.new()
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(overlay)
+	add_child(overlay)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.66)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	UiFont.full_rect(dim)
+	overlay.add_child(dim)
+	var panel := GoldFrame.new()
+	UiFont.place(panel, 0.08, 0.28, 0.92, 0.64)
+	overlay.add_child(panel)
+	var col := VBoxContainer.new()
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 14)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(col)
+	panel.add_child(col)
+	var heading := UiFont.label("名前を決めてね", 30 if not _portrait else 26, UiFont.GOLD)
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(heading)
+	var note := UiFont.label("戦績はこの端末に保存されるよ", 16, UiFont.CREAM)
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(note)
+	var edit := LineEdit.new()
+	edit.max_length = 10
+	edit.placeholder_text = "例： なつき"
+	edit.add_theme_font_override("font", UiFont.font())
+	edit.add_theme_font_size_override("font_size", 26)
+	edit.add_theme_color_override("font_color", UiFont.INK)
+	edit.add_theme_color_override("font_placeholder_color", Color("8a8174"))
+	edit.add_theme_color_override("font_focus_color", UiFont.INK)
+	edit.add_theme_color_override("font_selection_color", Color("f0c75e"))
+	edit.add_theme_stylebox_override("normal", UiFont.style(UiFont.PAPER, UiFont.BRASS, 2, 12))
+	edit.add_theme_stylebox_override("focus", UiFont.style(UiFont.PAPER, UiFont.BRASS, 2, 12))
+	edit.custom_minimum_size = Vector2(0, 64)
+	edit.text_submitted.connect(_submit_name)
+	col.add_child(edit)
+	_name_hint = UiFont.label("", 16, UiFont.EMBER)
+	_name_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_name_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(_name_hint)
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 16)
+	actions.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(actions)
+	var submit := UiFont.royal_button("決める", 24, true)
+	submit.custom_minimum_size = Vector2(160, 60)
+	submit.pressed.connect(func() -> void: _submit_name(edit.text))
+	actions.add_child(submit)
+	var skip := UiFont.royal_button("スキップ", 24, false)
+	skip.custom_minimum_size = Vector2(160, 60)
+	skip.pressed.connect(_close_name_entry)
+	actions.add_child(skip)
+	_name_edit = edit
+	_name_panel = overlay
+
+
+func _submit_name(raw: String) -> void:
+	var text := raw.strip_edges()
+	if SaveStore.set_display_name(text):
+		_build()
+		return
+	if _name_hint != null:
+		_name_hint.text = "1〜10文字で入力してね"
+
+
+func _close_name_entry() -> void:
+	if _name_panel != null:
+		_name_panel.visible = false
 
 
 func _build_menu_landscape() -> void:
@@ -194,9 +320,11 @@ func _build_menu_landscape() -> void:
 	menu.add_theme_constant_override("separation", 18)
 	UiFont.place(menu, 0.06, 0.875, 0.94, 0.985)
 	add_child(menu)
+	var avail := get_viewport_rect().size.x * 0.88
+	var width := clampf((avail - 54.0) / 4.0, 120.0, 230.0)
 	for item in _menu_items():
 		var button := UiFont.royal_button(str(item[0]), 24, bool(item[1]))
-		button.custom_minimum_size = Vector2(230, 64)
+		button.custom_minimum_size = Vector2(width, 64)
 		button.pressed.connect(item[2])
 		menu.add_child(button)
 

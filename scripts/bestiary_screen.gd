@@ -10,6 +10,7 @@ var _name: Label
 var _role: Label
 var _stats: Label
 var _description: Label
+var _special: Label
 var _record: Label
 var _selected := ""
 
@@ -105,6 +106,8 @@ func _ready() -> void:
 	copy.add_child(_role)
 	_stats = UiFont.label("", 22, UiFont.CREAM)
 	copy.add_child(_stats)
+	_special = UiFont.label("", 20, UiFont.GOLD)
+	copy.add_child(_special)
 	_description = UiFont.label("", 22, UiFont.PAPER)
 	_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	copy.add_child(_description)
@@ -146,6 +149,7 @@ func _show_entry(kind: String) -> void:
 		_name.text = "未遭遇"
 		_role.text = "UNKNOWN"
 		_stats.text = ""
+		_special.text = ""
 		_description.text = "戦場で出会うと記録される。"
 		_record.text = "撃破  ―"
 		return
@@ -154,6 +158,7 @@ func _show_entry(kind: String) -> void:
 	_role.text = "乱入ボス" if Balance.BOSS_KINDS.has(kind) else "校庭の敵"
 	var stats: Dictionary = Balance.ENEMIES[kind]
 	_stats.text = "HP %d   速 %d   接触 %d" % [int(stats.hp), int(stats.speed), int(stats.touch)]
+	_special.text = "必殺技  %s" % str(Balance.BOSS_SPECIAL.get(kind, "")) if Balance.BOSS_KINDS.has(kind) else ""
 	_description.text = str(Balance.ENEMY_DESCRIPTION[kind])
 	_record.text = "撃破  %d" % kills
 

@@ -102,6 +102,10 @@ const ENEMY_DESCRIPTION := {
 }
 const BOSS_POISON := "poison"
 const BOSS_VOLLEY := "volley"
+const BOSS_SPECIAL := {
+	KIND_NIMOTON: "毒液シャワー",
+	KIND_KASSEN: "バレーボール弾",
+}
 
 const BUTTO := "buttobashi"
 const ONIGIRI := "onigiri"

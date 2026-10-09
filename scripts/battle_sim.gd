@@ -756,7 +756,10 @@ func _update_boss_raid() -> void:
 	boss_spawn_attempted = true
 	if rng.randf() >= Balance.BOSS_SPAWN_CHANCE:
 		return
-	var kind := Balance.KIND_NIMOTON if rng.randf() < 0.5 else Balance.KIND_KASSEN
+	var nimoton_chance := 0.5
+	if character_id == Balance.CHAR_KENNY:
+		nimoton_chance = 0.35
+	var kind := Balance.KIND_NIMOTON if rng.randf() < nimoton_chance else Balance.KIND_KASSEN
 	_spawn_kind(kind, time)
 
 

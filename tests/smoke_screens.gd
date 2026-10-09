@@ -50,8 +50,8 @@ func _check_layout() -> void:
 
 func _check_title() -> void:
 	var title := current
-	if _count_buttons(title) != 4:
-		print("TITLE landscape buttons != 4")
+	if _count_buttons(title) < 4:
+		print("TITLE landscape buttons < 4")
 		fails += 1
 	if not _has_menu(title, false):
 		print("TITLE landscape menu not horizontal")
@@ -59,8 +59,8 @@ func _check_title() -> void:
 	_clear_children(title)
 	title._portrait = true
 	title._build()
-	if _count_buttons(title) != 4:
-		print("TITLE portrait buttons != 4")
+	if _count_buttons(title) < 4:
+		print("TITLE portrait buttons < 4")
 		fails += 1
 	if not _has_menu(title, true):
 		print("TITLE portrait menu not vertical")
@@ -92,26 +92,28 @@ func _check_shop() -> void:
 
 func _check_battle() -> void:
 	var battle := current
+	battle._stacked_cards = false
+	battle._compact_layout = false
+	_rebuild_choice(battle)
 	if battle.card_row is not HBoxContainer:
 		print("BATTLE landscape card_row not HBox")
 		fails += 1
 	battle._stacked_cards = true
 	battle._compact_layout = true
-	if battle.build_root != null and battle.build_root.get_parent() != null:
-		battle.build_root.get_parent().free()
-	battle._build_choice()
+	_rebuild_choice(battle)
 	if battle.card_row is not VBoxContainer:
 		print("BATTLE portrait card_row not VBox")
 		fails += 1
-	if sim_levels_ok(battle):
-		var stacked_card: Control = battle._card(0, Balance.UPGRADES[0])
-		if stacked_card == null or stacked_card.get_child_count() == 0:
-			print("BATTLE stacked card failed")
-			fails += 1
+	var stacked_card: Control = battle._card(0, Balance.UPGRADES[0])
+	if stacked_card == null or stacked_card.get_child_count() == 0:
+		print("BATTLE stacked card failed")
+		fails += 1
 
 
-func sim_levels_ok(battle: Node) -> bool:
-	return battle.sim != null
+func _rebuild_choice(battle: Node) -> void:
+	if battle.build_root != null and battle.build_root.get_parent() != null:
+		battle.build_root.get_parent().free()
+	battle._build_choice()
 
 
 func _clear_children(node: Node) -> void:

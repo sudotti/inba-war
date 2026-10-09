@@ -113,6 +113,8 @@ func _ready() -> void:
 	camera.position_smoothing_enabled = false
 	add_child(camera)
 	camera.make_current()
+	_apply_camera_zoom()
+	get_viewport().size_changed.connect(_on_viewport_size_changed)
 	_load_frames()
 	art_normal = load(ART_NORMAL)
 	art_fast = load(ART_FAST)
@@ -941,6 +943,16 @@ func _draw_hp_bar(foot: Vector2, head: float, ratio: float) -> void:
 	draw_rect(Rect2(origin, Vector2(width * clampf(ratio, 0.0, 1.0), 5)), MASSA_COLOR, true)
 
 
+func _apply_camera_zoom() -> void:
+	var vp := get_viewport_rect().size
+	var zoom := clampf(minf(vp.x / 560.0, vp.y / 720.0), 0.6, 1.0)
+	camera.zoom = Vector2(zoom, zoom)
+
+
+func _on_viewport_size_changed() -> void:
+	_apply_camera_zoom()
+
+
 func _follow_camera() -> void:
 	var shown := get_viewport().get_visible_rect().size / camera.zoom
 	var pos: Vector2 = sim.player_pos
@@ -1003,18 +1015,22 @@ func _build_hud() -> void:
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.place(bar, 0.02, 0.012, 0.98, 0.10)
 	var hud_style := UiFont.style(Color(0.07, 0.08, 0.1, 0.94), Color(1, 0.95, 0.82, 0.7), 3, 18)
-	hud_style.content_margin_top = 6
-	hud_style.content_margin_bottom = 6
+	hud_style.content_margin_top = 4 if _compact_layout else 6
+	hud_style.content_margin_bottom = 4 if _compact_layout else 6
 	hud_style.content_margin_left = 14
 	hud_style.content_margin_right = 14
 	bar.add_theme_stylebox_override("panel", hud_style)
 	root.add_child(bar)
 
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override("separation", 2 if _compact_layout else 0)
+	bar.add_child(box)
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 8 if _compact_layout else 18)
+	row.add_theme_constant_override("separation", 4 if _compact_layout else 18)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	bar.add_child(row)
+	box.add_child(row)
 
 	var face := UiFont.cropped(_portrait_path(_who))
 	var atlas := AtlasTexture.new()
@@ -1065,10 +1081,21 @@ func _build_hud() -> void:
 	hp_fill.anchor_right = 1
 	track.add_child(hp_fill)
 
-	row.add_child(hp_box)
-	row.add_child(time_label)
-	row.add_child(score_label)
-	row.add_child(coin_label)
+	if _compact_layout:
+		var second := HBoxContainer.new()
+		second.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		second.add_theme_constant_override("separation", 4)
+		second.alignment = BoxContainer.ALIGNMENT_CENTER
+		box.add_child(second)
+		row.add_child(time_label)
+		second.add_child(hp_box)
+		second.add_child(score_label)
+		second.add_child(coin_label)
+	else:
+		row.add_child(hp_box)
+		row.add_child(time_label)
+		row.add_child(score_label)
+		row.add_child(coin_label)
 
 	var motion := "鉄パイプ  広範囲攻撃"
 	if _who == Balance.CHAR_TAKETCHI:
@@ -1097,7 +1124,21 @@ func _build_hud() -> void:
 	var special_box := VBoxContainer.new()
 	special_box.add_theme_constant_override("separation", 4)
 	UiFont.place(special_box, 0.76 if _compact_layout else 0.80, 0.70 if _compact_layout else 0.72, 0.98, 0.94 if _compact_layout else 0.91)
-	root.add_child(special_box)
+	var ui_layer := CanvasLayer.new()
+	ui_layer.layer = 6
+	add_child(ui_layer)
+	var ui_root := Control.new()
+	ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_layer.add_child(ui_root)
+	UiFont.full_rect(ui_root)
+	ui_root.add_child(special_box)
+	var home := UiFont.button("ホーム", 14 if _compact_layout else 16)
+	home.custom_minimum_size = Vector2(0, 40 if _compact_layout else 48)
+	UiFont.place(home, 0.80 if _compact_layout else 0.84, 0.108, 0.97, 0.16)
+	home.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file("res://scenes/title.tscn")
+	)
+	ui_root.add_child(home)
 	special_gauge = ProgressBar.new()
 	special_gauge.min_value = 0.0
 	special_gauge.max_value = Balance.SPECIAL_GAUGE_MAX
