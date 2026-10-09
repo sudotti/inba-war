@@ -79,27 +79,16 @@ func _refill() -> void:
 
 
 func _portrait_now() -> bool:
-	# Try to get actual window size via JavaScript (for web export)
 	var win_size := Vector2.ZERO
-	if OS.get_name() == "Web":
-		var js_size := JavaScript.eval("window.innerWidth + ',' + window.innerHeight")
-		if js_size is String:
-			var parts := js_size.split(",")
-			if parts.size() == 2:
-				win_size = Vector2(int(parts[0]), int(parts[1]))
-	
-	# Fallback to DisplayServer.window_get_size() for native builds
-	if win_size == Vector2.ZERO:
-		var methods := DisplayServer.get_method_list()
-		for m in methods:
-			if m.name == "window_get_size":
-				win_size = DisplayServer.window_get_size()
-				break
-	
-	if win_size != Vector2.ZERO:
+	var success := false
+	var methods := DisplayServer.get_method_list()
+	for m in methods:
+		if m.name == "window_get_size":
+			win_size = DisplayServer.window_get_size()
+			success = true
+			break
+	if success and win_size != Vector2.ZERO:
 		return win_size.y > win_size.x
-	
-	# Final fallback to viewport (affected by stretch mode)
 	return UiFont.portrait(get_viewport().get_visible_rect().size)
 
 
