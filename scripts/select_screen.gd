@@ -40,7 +40,7 @@ func _ready() -> void:
 	add_child(center)
 
 	if _is_portrait:
-		var scroll := ScrollContainer.new()
+		var scroll := ReverseScrollContainer.new()
 		scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_ENABLED
@@ -313,3 +313,17 @@ class CostumeIcon extends Control:
 			Vector2(cx - 3.0 * u, cy - 11.0 * u),
 		])
 		draw_colored_polygon(pts, UiFont.BRASS)
+
+
+class ReverseScrollContainer extends ScrollContainer:
+	func _ready() -> void:
+		scroll_vertical.connect(_on_scroll_vertical)
+		scroll_horizontal.connect(_on_scroll_horizontal)
+
+	func _on_scroll_vertical(value: float) -> void:
+		var max_v := get_v_scroll_bar().max_value
+		set_v_scroll(max_v - value)
+
+	func _on_scroll_horizontal(value: float) -> void:
+		var max_h := get_h_scroll_bar().max_value
+		set_h_scroll(max_h - value)
