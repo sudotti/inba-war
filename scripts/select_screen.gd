@@ -40,7 +40,7 @@ func _ready() -> void:
 	add_child(title)
 
 	if _is_portrait:
-		var scroll := ReverseScrollContainer.new()
+		var scroll := ScrollContainer.new()
 		scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_ENABLED
@@ -86,9 +86,10 @@ func _ready() -> void:
 func _card(who: String) -> Control:
 	var playable := SaveStore.is_playable(who)
 	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.custom_minimum_size = Vector2(300, 0)
 	var border := UiFont.BRASS if who == SaveStore.playable_character() else Color("3a3228")
-	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.1,0.1,0.14,0.42), UiFont.glass_border(0.85), 1, 14))
+	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.15, 0.12, 0.1, 0.9), UiFont.glass_border(0.9), 2, 16))
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)
 	margin.add_theme_constant_override("margin_right", 16)
@@ -314,17 +315,3 @@ class CostumeIcon extends Control:
 			Vector2(cx - 3.0 * u, cy - 11.0 * u),
 		])
 		draw_colored_polygon(pts, UiFont.BRASS)
-
-
-class ReverseScrollContainer extends ScrollContainer:
-	func _ready() -> void:
-		scroll_vertical.connect(_on_scroll_vertical)
-		scroll_horizontal.connect(_on_scroll_horizontal)
-
-	func _on_scroll_vertical(value: float) -> void:
-		var max_v := get_v_scroll_bar().max_value
-		set_v_scroll(max_v - value)
-
-	func _on_scroll_horizontal(value: float) -> void:
-		var max_h := get_h_scroll_bar().max_value
-		set_h_scroll(max_h - value)
