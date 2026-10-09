@@ -156,6 +156,7 @@ func _card(who: String) -> Control:
 		picture.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		UiFont.full_rect(picture)
 		col.add_child(picture)
 		_pictures[who] = picture
 
@@ -190,6 +191,7 @@ func _portrait_picture(who: String) -> TextureRect:
 	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	picture.custom_minimum_size = Vector2(140, 140)
 	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(picture)
 	_pictures[who] = picture
 	return picture
 
