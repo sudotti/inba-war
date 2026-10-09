@@ -98,13 +98,16 @@ var _boss_banner_tween: Tween
 var _seen_boss_alert := 0
 var _compact_layout := false
 var _stacked_cards := false
+var _stacked_card_h := 150.0
 
 
 func _ready() -> void:
 	_who = SaveStore.playable_character()
 	var viewport_size := get_viewport_rect().size
 	_compact_layout = viewport_size.x < 1080.0 or viewport_size.y < 600.0
-	_stacked_cards = viewport_size.x < 560.0
+	_stacked_cards = viewport_size.x < 560.0 or viewport_size.y > viewport_size.x
+	var stacked_avail := viewport_size.y * 0.78 - 216.0
+	_stacked_card_h = clampf((stacked_avail - 12.0) / 3.0, 96.0, 150.0)
 	sim = BattleSim.new(_who)
 	camera = Camera2D.new()
 	camera.position_smoothing_enabled = false
@@ -1122,7 +1125,7 @@ func _build_stick() -> void:
 	UiFont.full_rect(root)
 	stick = Stick.new()
 	root.add_child(stick)
-	UiFont.place(stick, 0.0, 0.0, 0.46, 1.0)
+	UiFont.full_rect(stick)
 
 
 func _build_special_cut_in() -> void:
@@ -1460,7 +1463,7 @@ func _card(index: int, id: String) -> Control:
 	var card_height := 280.0
 	if _stacked_cards:
 		card_width = viewport_size.x * 0.80
-		card_height = 150.0
+		card_height = _stacked_card_h
 	elif _compact_layout:
 		card_width = maxf(150.0, minf(240.0, (viewport_size.x * 0.82 - 16.0) / 3.0))
 		card_height = clampf(viewport_size.y * 0.52, 200.0, 260.0)

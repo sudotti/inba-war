@@ -1,7 +1,7 @@
 extends Control
 
-const RADIUS_MIN := 72.0
-const RADIUS_MAX := 112.0
+const RADIUS_MIN := 96.0
+const RADIUS_MAX := 144.0
 
 var direction := Vector2.ZERO
 
@@ -70,8 +70,8 @@ func _default_base() -> Vector2:
 
 
 func _radius() -> float:
-	var screen_width := size.x / 0.46
-	var target := minf(size.y * 0.145, screen_width * 0.08125)
+	var screen_width := size.x
+	var target := minf(size.y * 0.145, screen_width * 0.105)
 	return clampf(target, RADIUS_MIN, RADIUS_MAX)
 
 
