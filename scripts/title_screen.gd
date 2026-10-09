@@ -57,13 +57,13 @@ func _build_top_bar() -> void:
 	bar.add_child(left)
 
 	var name_pill := _make_pill(SaveStore.shown_name(), 160)
-	name_pill.anchor_left = 0.0
+	name_pill.anchor_left = 0.5
 	name_pill.anchor_top = 0.5
-	name_pill.anchor_right = 0.0
+	name_pill.anchor_right = 0.5
 	name_pill.anchor_bottom = 0.5
-	name_pill.offset_left = 16
+	name_pill.offset_left = -80
 	name_pill.offset_top = -18
-	name_pill.offset_right = 176
+	name_pill.offset_right = 80
 	name_pill.offset_bottom = 18
 	left.add_child(name_pill)
 
@@ -72,14 +72,14 @@ func _build_top_bar() -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(right)
 
-	var yen_pill := _make_pill("💰 " + str(int(SaveStore.data.get("yen", 0))), 136)
-	yen_pill.anchor_left = 1.0
+	var yen_pill := _make_pill("💰 " + str(int(SaveStore.data.get("yen", 0))) + "円", 160)
+	yen_pill.anchor_left = 0.5
 	yen_pill.anchor_top = 0.5
-	yen_pill.anchor_right = 1.0
+	yen_pill.anchor_right = 0.5
 	yen_pill.anchor_bottom = 0.5
-	yen_pill.offset_left = -152
+	yen_pill.offset_left = -80
 	yen_pill.offset_top = -18
-	yen_pill.offset_right = -16
+	yen_pill.offset_right = 80
 	yen_pill.offset_bottom = 18
 	right.add_child(yen_pill)
 
@@ -307,18 +307,7 @@ func _open_settings() -> void:
 
 
 func _build_version() -> void:
-	var label := UiFont.label("v0.1.0", 12, Color(0.4, 0.35, 0.25, 0.6))
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.anchor_left = 0.5
-	label.anchor_top = 810.0 / H
-	label.anchor_right = 0.5
-	label.anchor_bottom = 810.0 / H
-	label.offset_left = -50
-	label.offset_top = -8
-	label.offset_right = 50
-	label.offset_bottom = 8
-	add_child(label)
+	pass
 
 
 func _name_button() -> Button:
