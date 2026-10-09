@@ -28,7 +28,7 @@ func _ready() -> void:
 	_is_portrait = UiFont.portrait(get_viewport_rect().size)
 	UiFont.full_rect(self)
 	var night := ColorRect.new()
-	night.color = Color(0.03,0.03,0.06,1.0)
+	night.color = Color(0.05, 0.04, 0.08, 1.0)
 	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFont.full_rect(night)
 	add_child(night)
@@ -43,7 +43,7 @@ func _ready() -> void:
 		var scroll := ScrollContainer.new()
 		scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_ENABLED
+		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 		UiFont.place(scroll, 0.04, 0.14, 0.96, 0.84)
 		add_child(scroll)
 		var content := VBoxContainer.new()
@@ -54,7 +54,8 @@ func _ready() -> void:
 		content.custom_minimum_size = Vector2(0, 1)
 		scroll.add_child(content)
 		for who in ORDER:
-			content.add_child(_card(who))
+			var card = _card(who)
+			content.add_child(card)
 		var spacer := Control.new()
 		spacer.custom_minimum_size = Vector2(0, 100)
 		content.add_child(spacer)
@@ -89,7 +90,7 @@ func _card(who: String) -> Control:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.custom_minimum_size = Vector2(300, 0)
 	var border := UiFont.BRASS if who == SaveStore.playable_character() else Color("3a3228")
-	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.15, 0.12, 0.1, 0.9), UiFont.glass_border(0.9), 2, 16))
+	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.2, 0.16, 0.12, 0.95), UiFont.glass_border(1.0), 2, 16))
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)
 	margin.add_theme_constant_override("margin_right", 16)
