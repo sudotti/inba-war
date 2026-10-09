@@ -3,7 +3,7 @@ extends Control
 const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
 
-const ORDER: Array[String] = [Balance.CHAR_KENNY, Balance.CHAR_TAKETCHI, Balance.CHAR_MASSA]
+const ORDER: Array[String] = [Balance.CHAR_MASSA, Balance.CHAR_TAKETCHI, Balance.CHAR_KENNY]
 const LOCK_ART := "res://assets/ui/lock.png"
 const BLURB := {
 	Balance.CHAR_MASSA: "広い射程と強い吹き飛ばし",
@@ -30,13 +30,9 @@ func _ready() -> void:
 
 	var title := UiFont.label("キャラクター選択", 36, UiFont.PAPER)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(title, 0.04, 0.03, 0.40, 0.12)
+	UiFont.place(title, 0.04, 0.03, 0.96, 0.12)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
-	var yen := UiFont.label("所持  %d イェン" % int(SaveStore.data.yen), 24, UiFont.BRASS)
-	yen.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	yen.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.place(yen, 0.50, 0.03, 0.96, 0.12)
-	add_child(yen)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 18)
@@ -61,22 +57,15 @@ func _ready() -> void:
 
 	var back := UiFont.royal_button("戻る", 24, false)
 	back.custom_minimum_size = Vector2(240, 64)
-	UiFont.place(back, 0.04, 0.86, 0.28 if not _is_portrait else 0.44, 0.97)
+	UiFont.place(back, 0.04, 0.86, 0.44 if _is_portrait else 0.28, 0.97)
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/title.tscn")
 	)
 	add_child(back)
-	var shop := UiFont.royal_button("商店", 24, false)
-	shop.custom_minimum_size = Vector2(280, 64)
-	UiFont.place(shop, 0.68 if not _is_portrait else 0.56, 0.86, 0.96, 0.97)
-	shop.pressed.connect(_open_shop)
-	add_child(shop)
 	_build_closet()
 
 
-func _open_shop() -> void:
-	SaveStore.shop_return = "res://scenes/select.tscn"
-	get_tree().change_scene_to_file("res://scenes/shop.tscn")
+
 
 
 func _card(who: String) -> Control:
@@ -177,7 +166,9 @@ func _add_card_actions(target: Control, who: String) -> void:
 		target.add_child(locked)
 		var go := UiFont.button("かけらを集める", 22)
 		go.custom_minimum_size = Vector2(0, 56)
-		go.pressed.connect(_open_shop)
+		go.pressed.connect(func() -> void:
+			pass
+		)
 		target.add_child(go)
 
 
