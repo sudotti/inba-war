@@ -123,6 +123,11 @@ func _fill() -> void:
 		var spacer := Control.new()
 		spacer.custom_minimum_size = Vector2(0, 24)
 		content.add_child(spacer)
+		
+		# Ensure content width matches scroll width
+		scroll.resized.connect(func() -> void:
+			content.custom_minimum_size.x = scroll.size.x
+		)
 	else:
 		var center := CenterContainer.new()
 		center.mouse_filter = Control.MOUSE_FILTER_IGNORE
