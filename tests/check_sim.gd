@@ -3,6 +3,7 @@ extends SceneTree
 const Balance = preload("res://scripts/balance.gd")
 const BattleSim = preload("res://scripts/battle_sim.gd")
 const SaveStore = preload("res://scripts/save_store.gd")
+const UiFont = preload("res://scripts/ui_font.gd")
 
 var fails := 0
 
@@ -10,6 +11,7 @@ var fails := 0
 func _initialize() -> void:
 	_balance()
 	_names()
+	_font_glyphs()
 	_combat()
 	_specials()
 	_spawn_and_round()
@@ -82,6 +84,18 @@ func _names() -> void:
 	_true(not Balance.is_valid_display_name(""), "empty invalid")
 	_true(not Balance.is_valid_display_name("massa!"), "symbol")
 	_true(not Balance.is_valid_display_name("ま さ"), "space")
+	_eq(Balance.SPECIAL_QUOTES[Balance.CHAR_MASSA], "印旛の未来は僕が守るっ！", "massa special quote")
+	_eq(Balance.SPECIAL_QUOTES[Balance.CHAR_TAKETCHI], "こいつら蹴散らしたら、銭湯行かね？", "takechi special quote")
+	_eq(Balance.SPECIAL_QUOTES[Balance.CHAR_KENNY], "私の勝利に、100ｲｪﾝ賭けます。", "kenny special quote")
+
+
+func _font_glyphs() -> void:
+	var font := UiFont.font()
+	for quote in Balance.SPECIAL_QUOTES.values():
+		var text := str(quote)
+		for index in text.length():
+			var codepoint := text.unicode_at(index)
+			_true(font.has_char(codepoint), "special font glyph U+%04X" % codepoint)
 
 
 func _specials() -> void:
@@ -93,10 +107,21 @@ func _specials() -> void:
 	_true(not sim.activate_special(), "special requires full charge")
 	sim.special_charge = Balance.SPECIAL_GAUGE_MAX
 	var target = sim.debug_place(Balance.KIND_NORMAL, sim.player_pos + Vector2(300, 0), 100, 0.0)
-	_true(sim.activate_special(), "massa special activates")
+	_true(sim.begin_special(), "massa special begins")
+	_true(sim.special_pending, "special waits through cut-in")
+	sim.step(1.0, Vector2.RIGHT)
+	_near(sim.time, 0.0, "special cut-in pauses battle")
+	_eq(target.hp, 100, "special waits before hitting")
+	_true(sim.resolve_special(), "massa special resolves")
 	_eq(target.hp, 58, "massa wide sweep damage")
 	_true(target.pos.distance_to(sim.player_pos) > 300.0, "massa special knockback")
 	_eq(sim.special_charge, 0.0, "special consumes charge")
+	_true(not sim.resolve_special(), "special resolves only once")
+
+	sim = BattleSim.new()
+	for _i in 20:
+		sim._register_kill(Balance.KIND_NORMAL)
+	_eq(sim.special_charge, Balance.SPECIAL_GAUGE_MAX, "special gauge is capped")
 
 	sim = BattleSim.new(Balance.CHAR_TAKETCHI)
 	sim.special_charge = Balance.SPECIAL_GAUGE_MAX

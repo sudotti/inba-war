@@ -76,8 +76,9 @@ var _special_cut_in: Control
 var _special_face: TextureRect
 var _special_name: Label
 var _special_quote: Label
-var _special_seen := 0
 var _special_ring_left := 0.0
+var _special_motion_left := 0.0
+var _special_motion_duration := 0.0
 var _special_tween: Tween
 
 
@@ -101,6 +102,7 @@ func _ready() -> void:
 
 func _process(dt: float) -> void:
 	_special_ring_left = maxf(0.0, _special_ring_left - dt)
+	_special_motion_left = maxf(0.0, _special_motion_left - dt)
 	if sim.finished:
 		_go_result()
 		return
@@ -277,6 +279,7 @@ func _burst(spot: Vector2, kind: String) -> void:
 
 func _draw() -> void:
 	_draw_ground()
+	_draw_special_aura()
 	if _special_ring_left > 0.0:
 		var progress := 1.0 - _special_ring_left / 0.58
 		var start := -PI * 0.5 + progress * TAU
@@ -324,15 +327,15 @@ func _draw() -> void:
 			var foot := Vector2(sim.player_pos) + Vector2(float(vis.sway), -float(vis.hop))
 			var pose := {
 				"hop": 0.0,
-				"rot": 0.0,
-				"sx": float(vis.face),
-				"sy": 1.0,
+				"rot": float(vis.rot),
+				"sx": float(vis.face) * float(vis.sx),
+				"sy": float(vis.sy),
 				"tint": vis.tint,
-				"lunge": Vector2.ZERO,
+				"lunge": Vector2(vis.lunge),
 				"flash": 0.0,
 			}
 			var tex: Texture2D = _frames[str(vis.frame)]
-			_draw_posed(tex, foot, _sprite_h(), 480.0, pose)
+			_draw_posed(tex, foot + Vector2(vis.lunge), _sprite_h(), 480.0, pose)
 		else:
 			var actor = item.actor
 			var pose := _enemy_pose(actor)
@@ -386,6 +389,10 @@ func _player_visual() -> Dictionary:
 	var frame := "idle"
 	var hop := sin(_anim * TAU * float(body.breath_hz)) * float(body.breath)
 	var sway := 0.0
+	var rot := 0.0
+	var sx := 1.0
+	var sy := 1.0
+	var lunge := Vector2.ZERO
 	if _strike_age < float(body.follow):
 		frame = "hit"
 		hop = 0.0
@@ -400,13 +407,60 @@ func _player_visual() -> Dictionary:
 		hop = lift * float(body.bob)
 		var side := 1.0 if idx % 2 == 0 else -1.0
 		sway = lift * float(body.sway) * side
+	if _special_motion_left > 0.0:
+		var progress := 1.0 - _special_motion_left / _special_motion_duration
+		var aim := _aim.normalized() if _aim.length() > 0.01 else Vector2.RIGHT
+		frame = "hit"
+		hop = 0.0
+		sway = 0.0
+		if _who == Balance.CHAR_MASSA:
+			rot = TAU * 1.5 * progress
+			hop = sin(progress * PI) * 15.0
+			sx = 1.0 + sin(progress * PI) * 0.12
+			sy = 1.0 - sin(progress * PI) * 0.08
+		elif _who == Balance.CHAR_TAKETCHI:
+			var strike := sin(progress * PI)
+			rot = -0.08 + strike * 0.14
+			lunge = aim * (18.0 + strike * 58.0)
+			sx = 1.0 + strike * 0.09
+			sy = 1.0 - strike * 0.1
+		else:
+			var beat := _anim * 30.0
+			frame = "hit" if int(floor(beat)) % 2 == 0 else "wind"
+			var kick := maxf(sin(beat * 0.5), 0.0)
+			lunge = aim * (14.0 + kick * 54.0)
+			rot = sin(beat) * 0.11
 	var tint := Color.WHITE
 	if _hurt_left > 0.0:
 		tint = Color(1, 0.5, 0.46)
 	elif float(sim.time) < Balance.INVULN_SECONDS:
 		var pulse := 0.45 + 0.55 * sin(float(sim.time) * 18.0)
 		tint = Color(0.78, 0.92, 1.0).lerp(Color.WHITE, pulse)
-	return {"frame": frame, "hop": hop, "sway": sway, "face": _player_face, "tint": tint}
+	return {"frame": frame, "hop": hop, "sway": sway, "face": _player_face, "tint": tint, "rot": rot, "sx": sx, "sy": sy, "lunge": lunge}
+
+
+func _draw_special_aura() -> void:
+	if _who == Balance.CHAR_TAKETCHI and sim.special_active_left > 0.0:
+		var pulse := 0.5 + 0.5 * sin(_anim * 12.0)
+		draw_arc(sim.player_pos, 54.0 + pulse * 10.0, 0.0, TAU, 56, Color(1.0, 0.72, 0.2, 0.48 + pulse * 0.2), 5.0, true)
+		for i in 8:
+			var angle := float(i) * TAU / 8.0 + _anim * 0.8
+			var direction := Vector2.from_angle(angle)
+			draw_line(sim.player_pos + direction * 66.0, sim.player_pos + direction * (78.0 + pulse * 12.0), Color(1.0, 0.9, 0.56, 0.62), 3.0, true)
+	if _who == Balance.CHAR_KENNY and sim.special_active_left > 0.0:
+		var tex: Texture2D = _frames["hit"]
+		for i in range(3, 0, -1):
+			var alpha := 0.22 - float(i) * 0.045
+			var pose := {
+				"hop": 0.0,
+				"rot": 0.0,
+				"sx": _player_face,
+				"sy": 1.0,
+				"tint": Color(0.44, 0.86, 1.0, alpha),
+				"lunge": -_aim.normalized() * float(i) * 24.0,
+				"flash": 0.0,
+			}
+			_draw_posed(tex, sim.player_pos + Vector2(0, -4), _sprite_h(), 480.0, pose)
 
 
 func _enemy_pose(actor) -> Dictionary:
@@ -936,9 +990,8 @@ func _build_special_cut_in() -> void:
 
 
 func _activate_special() -> void:
-	if sim == null or not sim.activate_special():
+	if sim == null or not sim.begin_special():
 		return
-	_special_seen = sim.special_serial
 	_special_face.texture = _face_texture()
 	_special_name.text = "%s  必殺技" % _who
 	_special_quote.text = str(Balance.SPECIAL_QUOTES[_who])
@@ -951,12 +1004,28 @@ func _activate_special() -> void:
 	_special_tween = create_tween()
 	_special_tween.tween_property(_special_cut_in, "modulate:a", 1.0, 0.14)
 	_special_tween.parallel().tween_property(_special_cut_in, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_special_tween.tween_interval(1.35)
+	_special_tween.tween_interval(0.62)
+	_special_tween.tween_callback(_resolve_special)
+	_special_tween.tween_interval(0.42)
 	_special_tween.tween_property(_special_cut_in, "modulate:a", 0.0, 0.24)
 	_special_tween.tween_callback(func() -> void: _special_cut_in.visible = false)
+	_update_special_hud()
+	queue_redraw()
+
+
+func _resolve_special() -> void:
+	if not sim.resolve_special():
+		return
 	if _who == Balance.CHAR_MASSA:
-		_special_ring_left = 0.58
-		_shake_left = 0.28
+		_special_motion_duration = 0.82
+		_special_ring_left = _special_motion_duration
+		_shake_left = 0.34
+	elif _who == Balance.CHAR_TAKETCHI:
+		_special_motion_duration = 0.72
+		_shake_left = 0.2
+	else:
+		_special_motion_duration = 0.68
+	_special_motion_left = _special_motion_duration
 	_update_special_hud()
 	queue_redraw()
 

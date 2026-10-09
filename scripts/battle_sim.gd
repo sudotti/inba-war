@@ -43,6 +43,7 @@ var damage_taken_scale: float = 1.0
 var special_charge: float = 0.0
 var special_active_left: float = 0.0
 var special_serial: int = 0
+var special_pending: bool = false
 
 var enemies: Array[Actor] = []
 var coins: Array[Coin] = []
@@ -147,16 +148,25 @@ func can_activate_special() -> bool:
 	return (
 		not finished
 		and not build_open
+		and not special_pending
 		and special_charge >= Balance.SPECIAL_GAUGE_MAX
 		and special_active_left <= 0.0
 	)
 
 
-func activate_special() -> bool:
+func begin_special() -> bool:
 	if not can_activate_special():
 		return false
 	special_charge = 0.0
 	special_serial += 1
+	special_pending = true
+	return true
+
+
+func resolve_special() -> bool:
+	if not special_pending or finished:
+		return false
+	special_pending = false
 	if character_id == Balance.CHAR_MASSA:
 		_special_sweep()
 	elif character_id == Balance.CHAR_TAKETCHI:
@@ -166,8 +176,14 @@ func activate_special() -> bool:
 	return true
 
 
+func activate_special() -> bool:
+	if not begin_special():
+		return false
+	return resolve_special()
+
+
 func step(dt: float, move_dir: Vector2) -> void:
-	if finished or build_open or dt <= 0.0:
+	if finished or build_open or special_pending or dt <= 0.0:
 		return
 	var left := dt
 	var guard := 0
