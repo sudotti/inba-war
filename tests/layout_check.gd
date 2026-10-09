@@ -40,9 +40,10 @@ func _process(_delta: float) -> bool:
 
 
 func _check_bounds(node: Node, in_scroll: bool) -> void:
+	var bounds: Rect2 = root.get_visible_rect()
 	if node is Control and node != current and not in_scroll:
 		var r: Rect2 = node.get_global_rect()
-		if r.position.x < -2.0 or r.position.y < -2.0 or r.end.x > root.size.x + 2.0 or r.end.y > root.size.y + 2.0:
+		if r.position.x < -2.0 or r.position.y < -2.0 or r.end.x > bounds.size.x + 2.0 or r.end.y > bounds.size.y + 2.0:
 			print("OVERFLOW %s: %s [%s]" % [node.name, r, PATHS[index - 1]])
 			fails += 1
 	var nested := in_scroll or node is ScrollContainer

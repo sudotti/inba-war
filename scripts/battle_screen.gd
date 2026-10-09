@@ -945,7 +945,7 @@ func _draw_hp_bar(foot: Vector2, head: float, ratio: float) -> void:
 
 func _apply_camera_zoom() -> void:
 	var vp := get_viewport_rect().size
-	var zoom := clampf(minf(vp.x / 560.0, vp.y / 720.0), 0.6, 1.0)
+	var zoom := clampf(minf(vp.x / 560.0, vp.y / 720.0), 0.6, 4.0)
 	camera.zoom = Vector2(zoom, zoom)
 
 
