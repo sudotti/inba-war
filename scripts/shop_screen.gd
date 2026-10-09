@@ -2,6 +2,7 @@ extends Control
 
 const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
+const SafeArea = preload("res://scripts/safe_area.gd")
 
 const UNIFORM_THUMB := "res://assets/battle/uniform/massa_idle.png"
 
@@ -9,38 +10,62 @@ var _yen: Label
 var _speech: Label
 var _note: Label
 var _goods: VBoxContainer
+var _main_margin: MarginContainer
+var _is_portrait := false
 
 
 func _ready() -> void:
-	UiFont.full_rect(self)
-	_build_background()
-	_build_header()
-	if UiFont.portrait(get_viewport_rect().size):
-		_build_body_portrait()
-	else:
-		_build_body_landscape()
+	_is_portrait = UiFont.portrait(get_viewport_rect().size)
+	get_viewport().size_changed.connect(_on_resized)
+	_build()
+
+
+func _on_resized() -> void:
+	var new_portrait = UiFont.portrait(get_viewport_rect().size)
+	if new_portrait != _is_portrait:
+		_is_portrait = new_portrait
+		_build()
+
+
+func _build() -> void:
+	for child in get_children():
+		child.queue_free()
+
+	var night := ColorRect.new()
+	night.color = UiFont.NIGHT
+	night.anchors_preset = Control.PRESET_FULL_RECT
+	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(night)
+
+	_main_margin = MarginContainer.new()
+	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
+	SafeArea.apply_safe_padding(_main_margin, get_viewport())
+	add_child(_main_margin)
+
+	var root := VBoxContainer.new()
+	root.alignment = BoxContainer.ALIGNMENT_CENTER
+	root.add_theme_constant_override("separation", 12)
+	_main_margin.add_child(root)
+
+	_build_header(root)
+	_build_body(root)
 	_refresh()
 
 
-func _build_background() -> void:
-	var night := ColorRect.new()
-	night.color = UiFont.NIGHT
-	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(night)
-	add_child(night)
-
-
-func _build_header() -> void:
+func _build_header(root: VBoxContainer) -> void:
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 14)
-	UiFont.place(header, 0.03, 0.025, 0.97, 0.12)
-	add_child(header)
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(header)
+
 	var title := UiFont.label("なかむら商店", 34, UiFont.GOLD)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
+
 	_yen = UiFont.label("", 24, UiFont.GOLD)
 	_yen.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	header.add_child(_yen)
+
 	var back := UiFont.royal_button("戻る", 20)
 	back.custom_minimum_size = Vector2(140, 54)
 	back.pressed.connect(func() -> void:
@@ -49,30 +74,39 @@ func _build_header() -> void:
 	header.add_child(back)
 
 
-func _build_body_landscape() -> void:
-	var body := HBoxContainer.new()
-	body.add_theme_constant_override("separation", 16)
-	UiFont.place(body, 0.03, 0.14, 0.97, 0.97)
-	add_child(body)
-	var stall := _stall_panel()
-	stall.custom_minimum_size = Vector2(400, 0)
-	body.add_child(stall)
-	var goods := _goods_panel()
-	goods.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_child(goods)
+func _build_body(root: VBoxContainer) -> void:
+	if _is_portrait:
+		var body := VBoxContainer.new()
+		body.add_theme_constant_override("separation", 12)
+		body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		root.add_child(body)
 
+		var stall := _stall_panel()
+		stall.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		stall.custom_minimum_size = Vector2(0, 280)
+		body.add_child(stall)
 
-func _build_body_portrait() -> void:
-	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 12)
-	UiFont.place(body, 0.03, 0.135, 0.97, 0.97)
-	add_child(body)
-	var stall := _stall_panel()
-	stall.custom_minimum_size = Vector2(0, 300)
-	body.add_child(stall)
-	var goods := _goods_panel()
-	goods.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_child(goods)
+		var goods := _goods_panel()
+		goods.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		goods.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		body.add_child(goods)
+	else:
+		var body := HBoxContainer.new()
+		body.add_theme_constant_override("separation", 16)
+		body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		root.add_child(body)
+
+		var stall := _stall_panel()
+		stall.custom_minimum_size = Vector2(380, 0)
+		stall.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		body.add_child(stall)
+
+		var goods := _goods_panel()
+		goods.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		goods.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		body.add_child(goods)
 
 
 func _stall_panel() -> Control:
@@ -87,6 +121,7 @@ func _stall_panel() -> Control:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
 	margin.add_child(col)
+
 	_speech = UiFont.label("", 20, UiFont.PAPER)
 	_speech.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_speech.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -101,10 +136,12 @@ func _stall_panel() -> Control:
 	bubble_margin.add_child(_speech)
 	_speech.add_theme_color_override("font_color", UiFont.INK)
 	col.add_child(bubble)
+
 	var art := StallArt.new()
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	art.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(art)
+
 	return panel
 
 
@@ -120,18 +157,23 @@ func _goods_panel() -> Control:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
 	margin.add_child(col)
+
 	col.add_child(UiFont.label("商品", 26, UiFont.PAPER))
+
 	_note = UiFont.label(" ", 18, UiFont.BRASS)
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(_note)
+
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	col.add_child(scroll)
+
 	_goods = VBoxContainer.new()
 	_goods.add_theme_constant_override("separation", 12)
 	_goods.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_goods)
+
 	return panel
 
 
@@ -145,9 +187,11 @@ func _refresh() -> void:
 		_speech.text = "仲間は全員加入済み。\n制服はもう持っているな。"
 	else:
 		_speech.text = "制服と解放かけらを置いてある。\n遠慮なく買っていけ。"
+
 	for child in _goods.get_children():
 		_goods.remove_child(child)
 		child.free()
+
 	_goods.add_child(_uniform_card(owns))
 	if locked.is_empty():
 		_goods.add_child(_sold_out_card())
