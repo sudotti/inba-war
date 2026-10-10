@@ -2,7 +2,6 @@ extends Control
 
 const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
-const SafeArea = preload("res://scripts/safe_area.gd")
 
 const ORDER: Array[String] = [Balance.CHAR_MASSA, Balance.CHAR_TAKETCHI, Balance.CHAR_KENNY]
 const LOCK_ART := "res://assets/ui/lock.png"
@@ -42,7 +41,8 @@ func _ready() -> void:
 	# Persistent safe area margin
 	_main_margin = MarginContainer.new()
 	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
-	SafeArea.apply_safe_padding(_main_margin, get_viewport())
+	_main_margin.add_theme_constant_override("margin_left", 24)
+	_main_margin.add_theme_constant_override("margin_right", 24)
 	add_child(_main_margin)
 
 	# Fixed container that stays alive - only its children are rebuilt
@@ -75,7 +75,6 @@ func _do_refill() -> void:
 		_main_container.remove_child(child)
 		child.queue_free()
 	# Reapply safe area padding for new orientation
-	SafeArea.apply_safe_padding(_main_margin, get_viewport())
 	_fill()
 	_rebuild_pending = false
 
@@ -84,21 +83,12 @@ func _get_current_orientation() -> bool:
 	# Get actual window size (not viewport)
 	var win_size := Vector2.ZERO
 	
-	# Web: use JavaScript to get browser window size
-	if OS.get_name() == "Web":
-		var js_result := JavaScript.eval("window.innerWidth + ',' + window.innerHeight")
-		if js_result is String:
-			var parts := js_result.split(",")
-			if parts.size() == 2:
-				win_size = Vector2(int(parts[0]), int(parts[1]))
-	
 	# Desktop: use DisplayServer
-	if win_size == Vector2.ZERO:
-		var methods := DisplayServer.get_method_list()
-		for m in methods:
-			if m.name == "window_get_size":
-				win_size = DisplayServer.window_get_size()
-				break
+	var methods := DisplayServer.get_method_list()
+	for m in methods:
+		if m.name == "window_get_size":
+			win_size = DisplayServer.window_get_size()
+			break
 	
 	# Fallback to viewport (fixed size in stretch mode)
 	if win_size == Vector2.ZERO:
@@ -115,47 +105,25 @@ func _fill() -> void:
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_main_container.add_child(title)
 
-	# Character list
-	if _is_portrait:
-		var scroll := ScrollContainer.new()
-		scroll.mouse_filter = Control.MOUSE_FILTER_STOP
-		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_main_container.add_child(scroll)
+	# Character list: vertical scroll
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_main_container.add_child(scroll)
 
-		var content := VBoxContainer.new()
-		content.add_theme_constant_override("separation", 12)
-		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		content.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		scroll.add_child(content)
+	# Vertical list
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 12)
+	scroll.add_child(content)
 
-		for who in ORDER:
-			var card = _card(who)
-			card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			content.add_child(card)
-
-		var spacer := Control.new()
-		spacer.custom_minimum_size = Vector2(0, 24)
-		content.add_child(spacer)
-	else:
-		var center := CenterContainer.new()
-		center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_main_container.add_child(center)
-
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 16)
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		center.add_child(row)
-
-		for who in ORDER:
-			var card = _card(who)
-			card.custom_minimum_size = Vector2(280, 0)
-			row.add_child(card)
+	# Character cards
+	for who in ORDER:
+		var card := _card(who)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		content.add_child(card)
 
 	# Back button
 	var back := UiFont.royal_button("戻る", 22, false)
@@ -175,8 +143,8 @@ func _card(who: String) -> Control:
 	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.2, 0.16, 0.12, 0.95), UiFont.glass_border(1.0), 2, 16))
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 16)
-	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
 	margin.add_theme_constant_override("margin_top", 12)
 	margin.add_theme_constant_override("margin_bottom", 12)
 	panel.add_child(margin)

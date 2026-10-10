@@ -70,8 +70,8 @@ static func style(fill: Color, border: Color, width: int = 4, radius: int = 18) 
 	box.border_color = border
 	box.set_border_width_all(width)
 	box.set_corner_radius_all(radius)
-	box.content_margin_left = 16
-	box.content_margin_right = 16
+	box.content_margin_left = 24
+	box.content_margin_right = 24
 	box.content_margin_top = 12
 	box.content_margin_bottom = 12
 	return box
@@ -124,10 +124,6 @@ static func royal_button(text: String, size: int = 24, primary: bool = false) ->
 
 static func royal_panel(fill: Color = ROYAL, border: Color = BRASS, width: int = 3, radius: int = 16) -> StyleBoxFlat:
 	return style(fill, border, width, radius)
-
-
-static func portrait(size: Vector2) -> bool:
-	return size.y > size.x
 
 
 static func full_rect(node: Control) -> void:

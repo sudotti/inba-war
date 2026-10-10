@@ -4,7 +4,6 @@ const Balance = preload("res://scripts/balance.gd")
 const BattleSim = preload("res://scripts/battle_sim.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
 const Stick = preload("res://scripts/virtual_stick.gd")
-const SafeArea = preload("res://scripts/safe_area.gd")
 
 const GRASS := Color("2c3b28")
 const GRASS_DARK := Color("243222")
@@ -97,30 +96,22 @@ var _boss_banner_name: Label
 var _boss_banner_action: Label
 var _boss_banner_tween: Tween
 var _seen_boss_alert := 0
-var _compact_layout := false
-var _stacked_cards := false
-var _stacked_card_h := 150.0
-var _is_portrait := false
+var _compact_layout := true
+var _stacked_cards := true
+var _stacked_card_h := 104.0
 var _hud_margin: MarginContainer
 var _boss_margin: MarginContainer
-var _ui_margin: MarginContainer
 var _special_margin: MarginContainer
 
 
 func _ready() -> void:
 	_who = SaveStore.playable_character()
-	var viewport_size := get_viewport_rect().size
-	_compact_layout = viewport_size.x < 1080.0 or viewport_size.y < 600.0
-	_stacked_cards = viewport_size.x < 560.0 or viewport_size.y > viewport_size.x
-	var stacked_avail := viewport_size.y * 0.78 - 216.0
-	_stacked_card_h = clampf((stacked_avail - 12.0) / 3.0, 96.0, 150.0)
 	sim = BattleSim.new(_who)
 	camera = Camera2D.new()
 	camera.position_smoothing_enabled = false
 	add_child(camera)
 	camera.make_current()
 	_apply_camera_zoom()
-	get_viewport().size_changed.connect(_on_viewport_size_changed)
 	_load_frames()
 	art_normal = load(ART_NORMAL)
 	art_fast = load(ART_FAST)
@@ -954,11 +945,6 @@ func _apply_camera_zoom() -> void:
 	var zoom := clampf(minf(vp.x / 560.0, vp.y / 720.0), 0.6, 4.0)
 	camera.zoom = Vector2(zoom, zoom)
 
-
-func _on_viewport_size_changed() -> void:
-	_apply_camera_zoom()
-
-
 func _follow_camera() -> void:
 	var shown := get_viewport().get_visible_rect().size / camera.zoom
 	var pos: Vector2 = sim.player_pos
@@ -1019,7 +1005,6 @@ func _build_hud() -> void:
 
 	_hud_margin = MarginContainer.new()
 	_hud_margin.anchors_preset = Control.PRESET_FULL_RECT
-	SafeArea.apply_safe_padding(_hud_margin, get_viewport())
 	root.add_child(_hud_margin)
 
 	var main_col := VBoxContainer.new()
@@ -1035,8 +1020,8 @@ func _build_hud() -> void:
 	var hud_style := UiFont.style(Color(0.07, 0.08, 0.1, 0.94), Color(1, 0.95, 0.82, 0.7), 3, 18)
 	hud_style.content_margin_top = 4 if _compact_layout else 6
 	hud_style.content_margin_bottom = 4 if _compact_layout else 6
-	hud_style.content_margin_left = 14
-	hud_style.content_margin_right = 14
+	hud_style.content_margin_left = 24
+	hud_style.content_margin_right = 24
 	bar.add_theme_stylebox_override("panel", hud_style)
 	main_col.add_child(bar)
 
@@ -1156,7 +1141,6 @@ func _build_hud() -> void:
 
 	var special_margin := MarginContainer.new()
 	special_margin.anchors_preset = Control.PRESET_FULL_RECT
-	SafeArea.apply_safe_padding(special_margin, get_viewport())
 	ui_root.add_child(special_margin)
 
 	var special_box := VBoxContainer.new()
@@ -1216,7 +1200,6 @@ func _build_special_cut_in() -> void:
 
 	_special_margin = MarginContainer.new()
 	_special_margin.anchors_preset = Control.PRESET_FULL_RECT
-	SafeArea.apply_safe_padding(_special_margin, get_viewport())
 	_special_cut_in.add_child(_special_margin)
 
 	var dim := ColorRect.new()
@@ -1231,8 +1214,8 @@ func _build_special_cut_in() -> void:
 	var band_style := UiFont.style(Color("17130f"), Color("e6bd62"), 5, 4)
 	band_style.content_margin_top = 24
 	band_style.content_margin_bottom = 24
-	band_style.content_margin_left = 32
-	band_style.content_margin_right = 32
+	band_style.content_margin_left = 24
+	band_style.content_margin_right = 24
 	band.add_theme_stylebox_override("panel", band_style)
 	_special_margin.add_child(band)
 
@@ -1364,7 +1347,6 @@ func _build_boss_hud() -> void:
 
 	_boss_margin = MarginContainer.new()
 	_boss_margin.anchors_preset = Control.PRESET_FULL_RECT
-	SafeArea.apply_safe_padding(_boss_margin, get_viewport())
 	root.add_child(_boss_margin)
 
 	var main_col := VBoxContainer.new()
@@ -1382,8 +1364,8 @@ func _build_boss_hud() -> void:
 	var boss_panel_style := UiFont.style(Color("17130f"), Color("dc5946"), 3, 5)
 	boss_panel_style.content_margin_top = 8
 	boss_panel_style.content_margin_bottom = 8
-	boss_panel_style.content_margin_left = 16
-	boss_panel_style.content_margin_right = 16
+	boss_panel_style.content_margin_left = 24
+	boss_panel_style.content_margin_right = 24
 	_boss_panel.add_theme_stylebox_override("panel", boss_panel_style)
 	main_col.add_child(_boss_panel)
 
@@ -1415,8 +1397,8 @@ func _build_boss_hud() -> void:
 	var banner_style := UiFont.style(Color("15120f"), Color("e0a448"), 5, 6)
 	banner_style.content_margin_top = 24
 	banner_style.content_margin_bottom = 24
-	banner_style.content_margin_left = 32
-	banner_style.content_margin_right = 32
+	banner_style.content_margin_left = 24
+	banner_style.content_margin_right = 24
 	_boss_banner.add_theme_stylebox_override("panel", banner_style)
 	main_col.add_child(_boss_banner)
 
@@ -1510,7 +1492,6 @@ func _build_choice() -> void:
 
 	var choice_margin = MarginContainer.new()
 	choice_margin.anchors_preset = Control.PRESET_FULL_RECT
-	SafeArea.apply_safe_padding(choice_margin, get_viewport())
 	build_root.add_child(choice_margin)
 
 	var col := VBoxContainer.new()
@@ -1591,15 +1572,8 @@ func _card(index: int, id: String) -> Control:
 	var accents: Array[Color] = [Color("2a241c"), Color("8c6840"), Color("6a4030")]
 	var accent: Color = accents[index % accents.size()]
 	var button := Button.new()
-	var viewport_size := get_viewport_rect().size
-	var card_width := 360.0
-	var card_height := 280.0
-	if _stacked_cards:
-		card_width = viewport_size.x * 0.80
-		card_height = _stacked_card_h
-	elif _compact_layout:
-		card_width = maxf(150.0, minf(240.0, (viewport_size.x * 0.82 - 16.0) / 3.0))
-		card_height = clampf(viewport_size.y * 0.52, 200.0, 260.0)
+	var card_width := 312.0
+	var card_height := _stacked_card_h
 	button.custom_minimum_size = Vector2(card_width, card_height)
 	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_stylebox_override("normal", UiFont.style(UiFont.PAPER, accent, 5, 18))
@@ -1625,9 +1599,9 @@ func _card(index: int, id: String) -> Control:
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	box.offset_left = 18
+	box.offset_left = 24
 	box.offset_top = 44 if _stacked_cards else 64
-	box.offset_right = -18
+	box.offset_right = -24
 	box.offset_bottom = -10 if _stacked_cards else -16
 	box.add_theme_constant_override("separation", 10)
 	button.add_child(box)

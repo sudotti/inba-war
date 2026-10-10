@@ -1,19 +1,12 @@
 extends Control
 
 const UiFont = preload("res://scripts/ui_font.gd")
-const SafeArea = preload("res://scripts/safe_area.gd")
 
 var _rows: VBoxContainer
 var _main_margin: MarginContainer
 
 
 func _ready() -> void:
-	get_viewport().size_changed.connect(_on_resized)
-	_build()
-	_refresh()
-
-
-func _on_resized() -> void:
 	_build()
 	_refresh()
 
@@ -30,7 +23,8 @@ func _build() -> void:
 
 	_main_margin = MarginContainer.new()
 	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
-	SafeArea.apply_safe_padding(_main_margin, get_viewport())
+	_main_margin.add_theme_constant_override("margin_left", 24)
+	_main_margin.add_theme_constant_override("margin_right", 24)
 	add_child(_main_margin)
 
 	var root := VBoxContainer.new()

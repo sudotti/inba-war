@@ -2,7 +2,6 @@ extends Control
 
 const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
-const SafeArea = preload("res://scripts/safe_area.gd")
 
 var _fragment: Label
 var _choice: HBoxContainer
@@ -11,7 +10,6 @@ var _shop: Button
 var _yen: Label
 var _reward := 0
 var _main_margin: MarginContainer
-var _is_portrait := false
 
 
 func _idle_path(who: String) -> String:
@@ -19,20 +17,9 @@ func _idle_path(who: String) -> String:
 
 
 func _ready() -> void:
-	_is_portrait = UiFont.portrait(get_viewport_rect().size)
-	get_viewport().size_changed.connect(_on_resized)
 	_build()
 	_sync_yen()
 	_resolve()
-
-
-func _on_resized() -> void:
-	var new_portrait = UiFont.portrait(get_viewport_rect().size)
-	if new_portrait != _is_portrait:
-		_is_portrait = new_portrait
-		_build()
-		_sync_yen()
-		_resolve()
 
 
 func _build() -> void:
@@ -47,7 +34,8 @@ func _build() -> void:
 
 	_main_margin = MarginContainer.new()
 	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
-	SafeArea.apply_safe_padding(_main_margin, get_viewport())
+	_main_margin.add_theme_constant_override("margin_left", 24)
+	_main_margin.add_theme_constant_override("margin_right", 24)
 	add_child(_main_margin)
 
 	var root := VBoxContainer.new()

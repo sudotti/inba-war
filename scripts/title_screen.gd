@@ -2,7 +2,6 @@ extends Control
 
 const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
-const SafeArea = preload("res://scripts/safe_area.gd")
 
 const HERO := "res://assets/portraits/masaki.png"
 
@@ -13,14 +12,9 @@ var _main_margin: MarginContainer
 
 
 func _ready() -> void:
-	get_viewport().size_changed.connect(_on_resized)
 	_build()
 	if SaveStore.shown_name() == "":
 		_open_name_entry()
-
-
-func _on_resized() -> void:
-	_build()
 
 
 func _build() -> void:
@@ -75,7 +69,8 @@ func _build_content() -> void:
 	_main_margin = MarginContainer.new()
 	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
 	UiFont.full_rect(_main_margin)
-	SafeArea.apply_safe_padding(_main_margin, get_viewport())
+	_main_margin.add_theme_constant_override("margin_left", 24)
+	_main_margin.add_theme_constant_override("margin_right", 24)
 	add_child(_main_margin)
 
 	var root := VBoxContainer.new()

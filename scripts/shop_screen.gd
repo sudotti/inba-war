@@ -2,7 +2,6 @@ extends Control
 
 const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
-const SafeArea = preload("res://scripts/safe_area.gd")
 
 const UNIFORM_THUMB := "res://assets/battle/uniform/massa_idle.png"
 
@@ -11,20 +10,10 @@ var _speech: Label
 var _note: Label
 var _goods: VBoxContainer
 var _main_margin: MarginContainer
-var _is_portrait := false
 
 
 func _ready() -> void:
-	_is_portrait = UiFont.portrait(get_viewport_rect().size)
-	get_viewport().size_changed.connect(_on_resized)
 	_build()
-
-
-func _on_resized() -> void:
-	var new_portrait = UiFont.portrait(get_viewport_rect().size)
-	if new_portrait != _is_portrait:
-		_is_portrait = new_portrait
-		_build()
 
 
 func _build() -> void:
@@ -39,7 +28,8 @@ func _build() -> void:
 
 	_main_margin = MarginContainer.new()
 	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
-	SafeArea.apply_safe_padding(_main_margin, get_viewport())
+	_main_margin.add_theme_constant_override("margin_left", 24)
+	_main_margin.add_theme_constant_override("margin_right", 24)
 	add_child(_main_margin)
 
 	var root := VBoxContainer.new()
@@ -77,38 +67,21 @@ func _build_header(root: VBoxContainer) -> void:
 
 
 func _build_body(root: VBoxContainer) -> void:
-	if _is_portrait:
-		var body := VBoxContainer.new()
-		body.add_theme_constant_override("separation", 12)
-		body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		root.add_child(body)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 12)
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(body)
 
-		var stall := _stall_panel()
-		stall.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		stall.custom_minimum_size = Vector2(0, 280)
-		body.add_child(stall)
+	var stall := _stall_panel()
+	stall.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stall.custom_minimum_size = Vector2(0, 280)
+	body.add_child(stall)
 
-		var goods := _goods_panel()
-		goods.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		goods.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		body.add_child(goods)
-	else:
-		var body := HBoxContainer.new()
-		body.add_theme_constant_override("separation", 16)
-		body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		root.add_child(body)
-
-		var stall := _stall_panel()
-		stall.custom_minimum_size = Vector2(380, 0)
-		stall.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		body.add_child(stall)
-
-		var goods := _goods_panel()
-		goods.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		goods.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		body.add_child(goods)
+	var goods := _goods_panel()
+	goods.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	goods.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(goods)
 
 
 func _stall_panel() -> Control:
