@@ -1005,6 +1005,8 @@ func _build_hud() -> void:
 
 	_hud_margin = MarginContainer.new()
 	_hud_margin.anchors_preset = Control.PRESET_FULL_RECT
+	_hud_margin.add_theme_constant_override("margin_left", 24)
+	_hud_margin.add_theme_constant_override("margin_right", 24)
 	root.add_child(_hud_margin)
 
 	var main_col := VBoxContainer.new()
@@ -1141,6 +1143,8 @@ func _build_hud() -> void:
 
 	var special_margin := MarginContainer.new()
 	special_margin.anchors_preset = Control.PRESET_FULL_RECT
+	special_margin.add_theme_constant_override("margin_left", 24)
+	special_margin.add_theme_constant_override("margin_right", 24)
 	ui_root.add_child(special_margin)
 
 	var special_box := VBoxContainer.new()
@@ -1200,6 +1204,8 @@ func _build_special_cut_in() -> void:
 
 	_special_margin = MarginContainer.new()
 	_special_margin.anchors_preset = Control.PRESET_FULL_RECT
+	_special_margin.add_theme_constant_override("margin_left", 24)
+	_special_margin.add_theme_constant_override("margin_right", 24)
 	_special_cut_in.add_child(_special_margin)
 
 	var dim := ColorRect.new()
@@ -1347,6 +1353,8 @@ func _build_boss_hud() -> void:
 
 	_boss_margin = MarginContainer.new()
 	_boss_margin.anchors_preset = Control.PRESET_FULL_RECT
+	_boss_margin.add_theme_constant_override("margin_left", 24)
+	_boss_margin.add_theme_constant_override("margin_right", 24)
 	root.add_child(_boss_margin)
 
 	var main_col := VBoxContainer.new()
@@ -1492,6 +1500,8 @@ func _build_choice() -> void:
 
 	var choice_margin = MarginContainer.new()
 	choice_margin.anchors_preset = Control.PRESET_FULL_RECT
+	choice_margin.add_theme_constant_override("margin_left", 24)
+	choice_margin.add_theme_constant_override("margin_right", 24)
 	build_root.add_child(choice_margin)
 
 	var col := VBoxContainer.new()
