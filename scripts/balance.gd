@@ -61,7 +61,6 @@ const STUN_SECONDS := 1.2
 const STUN_TANK_SECONDS := 0.6
 
 const UPGRADE_MAX := 5
-const CONE_RADIUS := 22.0
 
 const KILL_CAP_NORMAL := 350
 const KILL_CAP_FAST := 180
@@ -264,13 +263,6 @@ const UPGRADE_SHORT := {
 	MAAI: "間合い",
 	RENDA: "連打",
 }
-
-# 狭い校庭の中央は空けて、開始直後に挟まれないようにする。座標は 1600×1100 の校庭。
-const CONE_POINTS: Array[Vector2] = [
-	Vector2(347, 481), Vector2(400, 536), Vector2(360, 605),
-	Vector2(1200, 674), Vector2(1267, 619), Vector2(1173, 756),
-	Vector2(800, 248), Vector2(880, 289), Vector2(720, 303),
-]
 
 # 遊んだあとの間隔。6体で最初、そのあと差が少しずつ開く。
 const BUILD_PRESET: Array[int] = [6, 15, 27, 42, 60, 80, 102]

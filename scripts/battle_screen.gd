@@ -12,19 +12,15 @@ const DIRT := Color("c6a56e")
 const TRACK := Color(1, 1, 1, 0.72)
 const MASSA_COLOR := Color("f3ead2")
 const COIN_COLOR := Color("ffc107")
-const TREE_SPOTS: Array[Vector2] = [
-	Vector2(453, 688),
-	Vector2(1140, 646),
-	Vector2(653, 784),
-	Vector2(1040, 756),
-]
 
 const ART_NORMAL := "res://assets/battle/enemy_normal.png"
 const ART_FAST := "res://assets/battle/enemy_fast.png"
 const ART_TANK := "res://assets/battle/enemy_tank.png"
-const ART_CONE := "res://assets/battle/cone.png"
 const ART_NIMOTON := "res://assets/battle/boss_nimoton.png"
 const ART_KASSEN := "res://assets/battle/boss_kassen.png"
+const ART_FIELD_A := "res://assets/battle/field_a.png"
+const ART_FIELD_B := "res://assets/battle/field_b.png"
+const ART_COIN := "res://assets/battle/coin.png"
 
 var sim
 var camera: Camera2D
@@ -32,9 +28,12 @@ var stick
 var art_normal: Texture2D
 var art_fast: Texture2D
 var art_tank: Texture2D
-var art_cone: Texture2D
 var art_nimoton: Texture2D
 var art_kassen: Texture2D
+var art_field_a: Texture2D
+var art_field_b: Texture2D
+var art_coin: Texture2D
+var field_texture: Texture2D
 
 var time_label: Label
 var hp_label: Label
@@ -116,9 +115,12 @@ func _ready() -> void:
 	art_normal = load(ART_NORMAL)
 	art_fast = load(ART_FAST)
 	art_tank = load(ART_TANK)
-	art_cone = load(ART_CONE)
 	art_nimoton = load(ART_NIMOTON)
 	art_kassen = load(ART_KASSEN)
+	art_field_a = load(ART_FIELD_A)
+	art_field_b = load(ART_FIELD_B)
+	art_coin = load(ART_COIN)
+	field_texture = art_field_a if randi() % 2 == 0 else art_field_b
 	_build_hud()
 	_build_boss_hud()
 	_build_stick()
@@ -307,6 +309,17 @@ func _burst(spot: Vector2, kind: String) -> void:
 		})
 
 
+func _spawn_puff(pos: Vector2, color: Color) -> void:
+	_puffs.append({
+		"pos": pos,
+		"vel": Vector2(randf_range(-30.0, 30.0), randf_range(-60.0, -10.0)),
+		"life": 0.35,
+		"max": 0.35,
+		"color": color,
+		"size": randf_range(6.0, 14.0),
+	})
+
+
 func _draw_boss_telegraphs() -> void:
 	for pool in sim.poison_pools:
 		var fade := clampf(float(pool.life) / 0.8, 0.0, 1.0)
@@ -360,8 +373,6 @@ func _draw() -> void:
 		draw_arc(sim.player_pos, radius - 18.0, start + 0.7, start + TAU * 0.78, 96, Color(1.0, 0.97, 0.78, 0.78 * (1.0 - progress)), 7.0, true)
 	var shadow_r := 32.0 if str(sim.character_id) == Balance.CHAR_TAKETCHI else 24.0
 	_draw_shadow(sim.player_pos, shadow_r * (1.0 if _strike_age > 0.2 else 0.82))
-	for cone in sim.cones:
-		_draw_shadow(cone.pos, 18.0)
 	for actor in sim.enemies:
 		_draw_shadow(actor.pos, float(actor.radius) * 0.85)
 	for coin in sim.coins:
@@ -376,25 +387,14 @@ func _draw() -> void:
 
 	# 足元の位置で前後を決める。当たり判定の円はそのまま。
 	var order: Array[Dictionary] = []
-	for cone in sim.cones:
-		order.append({"y": cone.pos.y, "kind": "cone", "pos": cone.pos})
 	for actor in sim.enemies:
 		order.append({"y": actor.pos.y, "kind": "enemy", "actor": actor})
 	order.append({"y": sim.player_pos.y, "kind": "player"})
-	order.append({"y": 421.0, "kind": "school"})
-	for spot in TREE_SPOTS:
-		order.append({"y": spot.y, "kind": "tree", "pos": spot})
 	order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return float(a.y) < float(b.y)
 	)
 	for item in order:
-		if str(item.kind) == "cone":
-			_draw_still(art_cone, Vector2(item.pos), 76.0, 62.0)
-		elif str(item.kind) == "school":
-			_draw_school()
-		elif str(item.kind) == "tree":
-			_draw_tree(Vector2(item.pos))
-		elif str(item.kind) == "player":
+		if str(item.kind) == "player":
 			var vis := _player_visual()
 			var foot := Vector2(sim.player_pos) + Vector2(float(vis.sway), -float(vis.hop))
 			var pose := {
@@ -429,9 +429,9 @@ func _draw() -> void:
 				max_h = 320.0
 				max_w = 420.0
 			elif actor.kind == Balance.KIND_KASSEN:
-				tex = art_tank
-				max_h = 232.0
-				max_w = 250.0
+				tex = art_kassen
+				max_h = 280.0
+				max_w = 300.0
 			var head := _draw_posed(tex, foot, max_h, max_w, pose)
 			if Balance.BOSS_KINDS.has(actor.kind):
 				var boss_color := Color("baf05c") if actor.kind == Balance.KIND_NIMOTON else Color("ffd05d")
@@ -598,16 +598,6 @@ func _enemy_pose(actor) -> Dictionary:
 		amp = 18.0
 		squash = 0.1
 		lean = 0.16
-	elif actor.kind == Balance.KIND_NIMOTON:
-		rate = 5.2
-		amp = 13.0
-		squash = 0.12
-		lean = 0.08
-	elif actor.kind == Balance.KIND_KASSEN:
-		rate = 9.5
-		amp = 18.0
-		squash = 0.1
-		lean = 0.16
 	var phase: float = float(sim.time) * rate + float(id) * 0.7
 	var hop := 0.0 if stunned else absf(sin(phase)) * amp
 	var sx := 1.0
@@ -626,44 +616,43 @@ func _enemy_pose(actor) -> Dictionary:
 		var charge := 0.5 + 0.5 * sin(float(actor.state_left) * 18.0)
 		hop = 8.0 + charge * 15.0
 		sx += charge * 0.16
+		sy -= charge * 0.22
+		face = -1.0 if actor.target_pos.x < actor.pos.x else 1.0
+		if actor.state_left < 0.1:
+			_flash[id] = 0.16
+			_spawn_puff(actor.pos + Vector2(face * 30.0, -40.0), Color(0.7, 1.0, 0.2, 0.8))
 	elif actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "empower_windup":
 		var pulse := 0.5 + 0.5 * sin(float(actor.state_left) * 16.0)
-		sx += pulse * 0.18
-		sy -= pulse * 0.12
+		sx += pulse * 0.22
+		sy -= pulse * 0.15
+		hop = pulse * 8.0
+		if actor.state_left < 0.1:
+			_flash[id] = 0.16
+			_spawn_puff(actor.pos, Color(0.8, 1.0, 0.3, 0.9))
 	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "volley_windup":
 		hop = 16.0 + absf(sin(float(actor.state_left) * 11.0)) * 18.0
 		rot = face * -0.18
+		face = -1.0 if actor.target_pos.x < actor.pos.x else 1.0
+		if actor.state_left < 0.1:
+			_flash[id] = 0.16
+			_spawn_puff(actor.pos + Vector2(0.0, -60.0), Color(1.0, 0.85, 0.3, 0.8))
 	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_windup":
 		var crouch := clampf(1.0 - float(actor.state_left) / 0.68, 0.0, 1.0)
 		hop = 0.0
-		sy += crouch * 0.18
+		sy += crouch * 0.22
+		sx -= crouch * 0.1
 		rot = face * (-0.12 - crouch * 0.2)
+		face = -1.0 if actor.target_pos.x < actor.pos.x else 1.0
+		if actor.state_left < 0.1:
+			_flash[id] = 0.16
+			_spawn_puff(actor.pos + Vector2(face * 40.0, 0.0), Color(1.0, 0.6, 0.25, 0.8))
 	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_dash":
 		var dash: Vector2 = actor.target_pos - actor.pos
 		if dash.length() > 0.01:
-			lunge = dash.normalized() * 68.0
+			lunge = dash.normalized() * 120.0
 			rot = dash.angle() * 0.16
-	if actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "poison_windup":
-		var charge := 0.5 + 0.5 * sin(float(actor.state_left) * 18.0)
-		hop = 8.0 + charge * 15.0
-		sx += charge * 0.16
-	elif actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "empower_windup":
-		var pulse := 0.5 + 0.5 * sin(float(actor.state_left) * 16.0)
-		sx += pulse * 0.18
-		sy -= pulse * 0.12
-	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "volley_windup":
-		hop = 16.0 + absf(sin(float(actor.state_left) * 11.0)) * 18.0
-		rot = face * -0.18
-	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_windup":
-		var crouch := clampf(1.0 - float(actor.state_left) / 0.68, 0.0, 1.0)
-		hop = 0.0
-		sy += crouch * 0.18
-		rot = face * (-0.12 - crouch * 0.2)
-	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_dash":
-		var dash: Vector2 = actor.target_pos - actor.pos
-		if dash.length() > 0.01:
-			lunge = dash.normalized() * 68.0
-			rot = dash.angle() * 0.16
+			face = -1.0 if dash.x < 0.0 else 1.0
+			_spawn_puff(actor.pos - dash.normalized() * 30.0, Color(1.0, 0.7, 0.4, 0.5))
 	var bite := float(_bite.get(id, 0.0))
 	if bite > 0.0:
 		var toward := Vector2(sim.player_pos) - Vector2(actor.pos)
@@ -674,8 +663,6 @@ func _enemy_pose(actor) -> Dictionary:
 	var tint := Color.WHITE
 	if stunned:
 		tint = Color(1.2, 1.08, 0.55)
-	elif float(actor.empowered_left) > 0.0:
-		tint = Color(1.35, 1.18, 0.55)
 	elif float(actor.empowered_left) > 0.0:
 		tint = Color(1.35, 1.18, 0.55)
 	if flash > 0.0:
@@ -779,9 +766,16 @@ func _swing_dust() -> void:
 func _draw_coin(coin) -> void:
 	var bob := sin(sim.time * 7.0 + float(coin.id) * 1.3) * 4.0
 	var spot := Vector2(coin.pos) + Vector2(0.0, bob)
-	draw_circle(spot, 10.0, COIN_COLOR)
-	draw_arc(spot, 10.0, 0, TAU, 16, Color("8a6200"), 2.0, true)
-	draw_circle(spot + Vector2(-3.0, -3.0), 3.0, Color(1, 0.96, 0.75, 0.95))
+	if art_coin:
+		draw_texture_rect(art_coin, Rect2(spot.x - 16.0, spot.y - 16.0, 32.0, 32.0))
+	else:
+		draw_circle(spot, 10.0, COIN_COLOR)
+		draw_arc(spot, 10.0, 0, TAU, 16, Color("8a6200"), 2.0, true)
+		draw_circle(spot + Vector2(-3.0, -3.0), 3.0, Color(1, 0.96, 0.75, 0.95))
+	# Shadow
+	draw_set_transform(spot, 0.0, Vector2(1.0, 0.3))
+	draw_circle(Vector2.ZERO, 10.0, Color(0, 0, 0, 0.2))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_puff(puff: Dictionary) -> void:
@@ -805,11 +799,6 @@ func _draw_stun_marks(head: Vector2, salt: int) -> void:
 		draw_circle(spot, 3.0, Color(1, 0.92, 0.35, 0.95))
 
 
-func _draw_still(tex: Texture2D, foot: Vector2, max_h: float, max_w: float) -> void:
-	var pose := {"hop": 0.0, "rot": 0.0, "sx": 1.0, "sy": 1.0, "tint": Color.WHITE, "lunge": Vector2.ZERO, "flash": 0.0}
-	_draw_posed(tex, foot, max_h, max_w, pose)
-
-
 func _draw_posed(tex: Texture2D, foot: Vector2, max_h: float, max_w: float, pose: Dictionary) -> float:
 	var aspect := float(tex.get_width()) / float(tex.get_height())
 	var h := max_h
@@ -825,106 +814,15 @@ func _draw_posed(tex: Texture2D, foot: Vector2, max_h: float, max_w: float, pose
 
 
 func _draw_ground() -> void:
-	draw_rect(Rect2(0, 0, Balance.FIELD_W, Balance.FIELD_H), GRASS, true)
-	for i in 36:
-		var px := fposmod(float(i) * 487.0, Balance.FIELD_W)
-		var py := fposmod(float(i) * 269.0, Balance.FIELD_H)
-		var rx := 70.0 + fposmod(float(i) * 53.0, 120.0)
-		var patch := GRASS_LIGHT if i % 2 == 0 else GRASS_DARK
-		patch.a = 0.38
-		draw_set_transform(Vector2(px, py), 0.0, Vector2(1.0, 0.58))
-		draw_circle(Vector2.ZERO, rx, patch)
-	draw_set_transform(Vector2(800, 770), 0.0, Vector2(1.0, 0.48))
-	draw_circle(Vector2.ZERO, 370.0, Color("3d5238"))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	var mow := Color(1, 1, 1, 0.045)
-	var y := 20.0
-	while y < Balance.FIELD_H:
-		draw_line(Vector2(0, y), Vector2(Balance.FIELD_W, y), mow, 2.0)
-		y += 48.0
-	_draw_ellipse(Vector2(800, 770), 413.0, 206.0, TRACK, 4.0)
-	_draw_ellipse(Vector2(800, 770), 313.0, 144.0, Color(1, 1, 1, 0.4), 2.0)
-	var court := Rect2(600, 674, 400, 192)
-	draw_rect(court, TRACK, false, 3.0)
-	draw_line(Vector2(800, 674), Vector2(800, 866), Color(1, 1, 1, 0.45), 2.0, true)
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(785, 421),
-		Vector2(815, 421),
-		Vector2(840, 1073),
-		Vector2(760, 1073),
-	]), DIRT)
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(793, 421),
-		Vector2(807, 421),
-		Vector2(821, 1073),
-		Vector2(779, 1073),
-	]), Color("d8bc88"))
-	_draw_bed(Vector2(600, 688))
-	_draw_bed(Vector2(1000, 674))
+	if field_texture:
+		draw_texture_rect(field_texture, Rect2(0, 0, Balance.FIELD_W, Balance.FIELD_H))
+	else:
+		draw_rect(Rect2(0, 0, Balance.FIELD_W, Balance.FIELD_H), GRASS, true)
 	var rim := Color("1e2a1c")
 	draw_rect(Rect2(0, 0, Balance.FIELD_W, 26), rim, true)
 	draw_rect(Rect2(0, Balance.FIELD_H - 26, Balance.FIELD_W, 26), rim, true)
 	draw_rect(Rect2(0, 0, 26, Balance.FIELD_H), rim, true)
 	draw_rect(Rect2(Balance.FIELD_W - 26, 0, 26, Balance.FIELD_H), rim, true)
-	draw_rect(Rect2(520, 417, 560, 10), Color(0, 0, 0, 0.16), true)
-
-
-func _draw_ellipse(center: Vector2, rx: float, ry: float, color: Color, width: float) -> void:
-	var pts := PackedVector2Array()
-	var count := 72
-	for i in count + 1:
-		var ang := float(i) / float(count) * TAU
-		pts.append(center + Vector2(cos(ang) * rx, sin(ang) * ry))
-	draw_polyline(pts, color, width, true)
-
-
-func _draw_bed(center: Vector2) -> void:
-	draw_set_transform(center, 0.0, Vector2(1.0, 0.55))
-	draw_circle(Vector2.ZERO, 54.0, Color("8d6240"))
-	draw_circle(Vector2.ZERO, 48.0, Color("3d5c34"))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	draw_circle(center + Vector2(-16, -6), 6.0, Color("a86858"))
-	draw_circle(center + Vector2(8, 4), 6.0, Color("d7c49a"))
-	draw_circle(center + Vector2(22, -8), 5.0, Color("f7f1e6"))
-
-
-func _draw_school() -> void:
-	var left := 507.0
-	var right := 1093.0
-	var wall := 369.0
-	var base := 421.0
-	draw_rect(Rect2(left, wall, right - left, base - wall), Color("efe3c8"), true)
-	draw_rect(Rect2(left, wall, right - left, base - wall), Color("2a241c"), false, 4.0)
-	var peak := Vector2((left + right) * 0.5, 355.0)
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(left - 26, wall + 8),
-		peak,
-		Vector2(right + 26, wall + 8),
-	]), Color("3c4d6e"))
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(left - 26, wall + 8),
-		peak,
-		peak + Vector2(0, 10),
-		Vector2(left - 6, wall + 13),
-	]), Color("2d3b56"))
-	var frame := Color("2a241c")
-	var glass := Color("9aada8")
-	for x in [660.0, 727.0, 880.0, 947.0, 1013.0]:
-		draw_rect(Rect2(x, 381, 35, 25), frame, true)
-		draw_rect(Rect2(x + 2, 383, 31, 20), glass, true)
-		draw_line(Vector2(x + 17, 383), Vector2(x + 17, 402), frame, 2.0)
-	draw_rect(Rect2(528, 381, 117, 22), Color("17324f"), true)
-	draw_string(UiFont.font(), Vector2(543, 397), "印旛中学校", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("f7f1e6"))
-	draw_rect(Rect2(781, 391, 37, 30), Color("6d3b2c"), true)
-	draw_rect(Rect2(781, 391, 37, 30), Color("2a241c"), false, 3.0)
-	draw_circle(Vector2(811, 407), 2.0, Color("e2b43a"))
-
-
-func _draw_tree(foot: Vector2) -> void:
-	draw_rect(Rect2(foot.x - 7, foot.y - 58, 14, 58), Color("6b4428"), true)
-	draw_circle(foot + Vector2(0, -78), 30, Color("3e6240"))
-	draw_circle(foot + Vector2(-18, -64), 20, Color("4e7348"))
-	draw_circle(foot + Vector2(16, -66), 18, Color("345636"))
 
 
 func _draw_shadow(foot: Vector2, rx: float) -> void:
@@ -1056,6 +954,21 @@ func _build_hud() -> void:
 	who_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(who_label)
 
+	# Spacer to push home button to the right
+	var home_spacer := Control.new()
+	home_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	home_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(home_spacer)
+
+	# Home button at top-right
+	var home_btn := UiFont.button("ホーム", 14 if _compact_layout else 16)
+	home_btn.custom_minimum_size = Vector2(96, 44)
+	home_btn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	home_btn.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file("res://scenes/title.tscn")
+	)
+	row.add_child(home_btn)
+
 	time_label = UiFont.label("残り  3:00", 22 if _compact_layout else 30, UiFont.PAPER)
 	score_label = UiFont.label("得点  0", 18 if _compact_layout else 22, UiFont.PAPER)
 	coin_label = UiFont.label("コイン  0", 18 if _compact_layout else 22, UiFont.YELLOW)
@@ -1132,9 +1045,9 @@ func _build_hud() -> void:
 	UiFont.full_rect(_gain)
 	root.add_child(_gain)
 
-	# Special gauge and button (bottom right)
+	# Special gauge and button (bottom right) - layer 8 to be above stick (5) and boss HUD (7)
 	var ui_layer := CanvasLayer.new()
-	ui_layer.layer = 6
+	ui_layer.layer = 8
 	add_child(ui_layer)
 	var ui_root := Control.new()
 	ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1142,25 +1055,19 @@ func _build_hud() -> void:
 	UiFont.full_rect(ui_root)
 
 	var special_margin := MarginContainer.new()
-	special_margin.anchors_preset = Control.PRESET_FULL_RECT
+	UiFont.full_rect(special_margin)
 	special_margin.add_theme_constant_override("margin_left", 24)
 	special_margin.add_theme_constant_override("margin_right", 24)
+	special_margin.add_theme_constant_override("margin_top", 24)
+	special_margin.add_theme_constant_override("margin_bottom", 24)
 	ui_root.add_child(special_margin)
 
 	var special_box := VBoxContainer.new()
 	special_box.add_theme_constant_override("separation", 4)
 	special_box.alignment = BoxContainer.ALIGNMENT_END
-	special_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	special_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	special_box.size_flags_horizontal = Control.SIZE_SHRINK_END
+	special_box.size_flags_vertical = Control.SIZE_SHRINK_END
 	special_margin.add_child(special_box)
-
-	var home := UiFont.button("ホーム", 14 if _compact_layout else 16)
-	home.custom_minimum_size = Vector2(0, 40 if _compact_layout else 48)
-	home.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	home.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/title.tscn")
-	)
-	special_box.add_child(home)
 
 	special_gauge = ProgressBar.new()
 	special_gauge.min_value = 0.0
@@ -1171,7 +1078,7 @@ func _build_hud() -> void:
 	special_gauge.add_theme_stylebox_override("fill", UiFont.style(Color("d7b072"), Color("fff0c2"), 1, 6))
 	special_box.add_child(special_gauge)
 	special_button = UiFont.button("必殺技 0%", 16 if _compact_layout else 18)
-	special_button.custom_minimum_size = Vector2(0, 54) if _compact_layout else Vector2(0, 64)
+	special_button.custom_minimum_size = Vector2(200, 54)
 	special_button.pressed.connect(_activate_special)
 	special_button.add_theme_stylebox_override("disabled", UiFont.style(Color("24201b"), Color("68583b"), 2, 12))
 	special_button.add_theme_color_override("font_disabled_color", Color("c7b991"))
@@ -1508,8 +1415,7 @@ func _build_choice() -> void:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 16)
-	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.vertical_alignment = BoxContainer.ALIGNMENT_CENTER
 	choice_margin.add_child(col)
 
 	var heading := UiFont.label("強化選択", 32 if _compact_layout else 40, UiFont.PAPER)
@@ -1529,8 +1435,8 @@ func _build_choice() -> void:
 		card_row.add_theme_constant_override("separation", 8 if _compact_layout else 22)
 	card_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	card_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	card_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	card_row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(card_row)
 
 	timer_label = UiFont.label("20.0", 24, UiFont.PAPER)

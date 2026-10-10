@@ -31,11 +31,6 @@ class Coin extends RefCounted:
 	var pos: Vector2
 
 
-class Cone extends RefCounted:
-	var pos: Vector2
-	var radius: float
-
-
 class BossProjectile extends RefCounted:
 	var kind: String
 	var pos: Vector2
@@ -87,7 +82,6 @@ var special_resolved: bool = false
 
 var enemies: Array[Actor] = []
 var coins: Array[Coin] = []
-var cones: Array[Cone] = []
 
 var levels: Dictionary = {}
 var kills: int = 0
@@ -146,11 +140,6 @@ func _init(who: String = Balance.CHAR_MASSA) -> void:
 	player_pos = Balance.START
 	for id in Balance.UPGRADES:
 		levels[id] = 0
-	for point in Balance.CONE_POINTS:
-		var cone := Cone.new()
-		cone.pos = point
-		cone.radius = Balance.CONE_RADIUS
-		cones.append(cone)
 	view_rect = Rect2(player_pos - Vector2(640, 360), Vector2(1280, 720))
 	rng.randomize()
 	boss_spawn_time = rng.randf_range(35.0, 155.0)
@@ -352,7 +341,7 @@ func _move_player(dt: float, move_dir: Vector2) -> void:
 	var direction := move_dir
 	if direction.length() > 1.0:
 		direction = direction.normalized()
-	player_pos = _resolve(player_pos + direction * speed_now() * dt, player_radius)
+	player_pos = _clamp_field(player_pos + direction * speed_now() * dt, player_radius)
 
 
 func _move_enemies(dt: float) -> void:
@@ -372,7 +361,7 @@ func _move_enemies(dt: float) -> void:
 		var toward := player_pos - actor.pos
 		if toward.length() < 0.001:
 			continue
-		actor.pos = _resolve(actor.pos + toward.normalized() * actor.speed * dt, actor.radius)
+		actor.pos = _clamp_field(actor.pos + toward.normalized() * actor.speed * dt, actor.radius)
 
 
 func current_boss():
@@ -386,13 +375,13 @@ func _move_boss(actor: Actor, dt: float) -> void:
 	if actor.attack_state == "kick_dash":
 		var dash := actor.target_pos - actor.pos
 		if dash.length() > 0.001:
-			actor.pos = _resolve(actor.pos + dash.normalized() * 590.0 * dt, actor.radius)
+			actor.pos = _clamp_field(actor.pos + dash.normalized() * 590.0 * dt, actor.radius)
 		if not actor.dash_hit and actor.pos.distance_to(player_pos) <= actor.radius + player_radius + 34.0:
 			actor.dash_hit = true
 			_boss_hit_player(38)
 			var away := player_pos - actor.pos
 			if away.length() > 0.001:
-				player_pos = _resolve(player_pos + away.normalized() * 86.0, player_radius)
+				player_pos = _clamp_field(player_pos + away.normalized() * 86.0, player_radius)
 		actor.state_left -= dt
 		if actor.state_left <= 0.0:
 			actor.attack_state = ""
@@ -443,7 +432,7 @@ func _move_boss_range(actor: Actor, desired_range: float, dt: float) -> void:
 		move = -direction
 	else:
 		move = direction.orthogonal() * signf(sin(actor.phase * 1.7))
-	actor.pos = _resolve(actor.pos + move * actor.speed * dt, actor.radius)
+	actor.pos = _clamp_field(actor.pos + move * actor.speed * dt, actor.radius)
 
 
 func _resolve_boss_action(actor: Actor) -> void:
@@ -833,8 +822,6 @@ func _find_spawn(radius: float) -> Array:
 		)
 		if pos.distance_to(player_pos) > Balance.SPAWN_MAX_DISTANCE:
 			continue
-		if _hits_cone(pos, radius):
-			continue
 		if blocked.has_point(pos):
 			continue
 		return [pos]
@@ -893,8 +880,7 @@ func _knockback(actor: Actor, distance: float) -> void:
 	while left > 0.0:
 		var d := minf(step_len, left)
 		var nxt := actor.pos + away * d
-		# コーンと校庭の端では、滑らずに止まる。
-		if _hits_cone(nxt, actor.radius) or _out_of_field(nxt, actor.radius):
+		if _out_of_field(nxt, actor.radius):
 			break
 		actor.pos = nxt
 		left -= d
@@ -936,13 +922,6 @@ func _kaiju_alive() -> bool:
 	return false
 
 
-func _hits_cone(pos: Vector2, radius: float) -> bool:
-	for cone in cones:
-		if pos.distance_to(cone.pos) < radius + cone.radius:
-			return true
-	return false
-
-
 func _out_of_field(pos: Vector2, radius: float) -> bool:
 	return (
 		pos.x < radius
@@ -950,24 +929,6 @@ func _out_of_field(pos: Vector2, radius: float) -> bool:
 		or pos.x > Balance.FIELD_W - radius
 		or pos.y > Balance.FIELD_H - radius
 	)
-
-
-func _resolve(pos: Vector2, radius: float) -> Vector2:
-	var p := _clamp_field(pos, radius)
-	for _i in 6:
-		var hit := false
-		for cone in cones:
-			var diff := p - cone.pos
-			var min_d := radius + cone.radius
-			var dist := diff.length()
-			if dist < min_d:
-				var normal := Vector2.RIGHT if dist < 0.0001 else diff / dist
-				p = cone.pos + normal * min_d
-				hit = true
-		p = _clamp_field(p, radius)
-		if not hit:
-			break
-	return p
 
 
 func _clamp_field(pos: Vector2, radius: float) -> Vector2:
