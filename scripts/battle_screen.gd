@@ -73,6 +73,7 @@ var _face: Dictionary = {}
 var _flash: Dictionary = {}
 var _bite: Dictionary = {}
 var _puffs: Array[Dictionary] = []
+var _last_state: Dictionary = {}
 var special_button: Button
 var special_gauge: ProgressBar
 var _special_cut_in: Control
@@ -103,6 +104,15 @@ var _boss_margin: MarginContainer
 var _special_margin: MarginContainer
 
 
+func _safe_load(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		var res = load(path)
+		if res is Texture2D:
+			return res
+	push_warning("読み込み失敗: " + path)
+	return null
+
+
 func _ready() -> void:
 	_who = SaveStore.playable_character()
 	sim = BattleSim.new(_who)
@@ -111,20 +121,26 @@ func _ready() -> void:
 	add_child(camera)
 	camera.make_current()
 	_apply_camera_zoom()
-	_load_frames()
-	art_normal = load(ART_NORMAL)
-	art_fast = load(ART_FAST)
-	art_tank = load(ART_TANK)
-	art_nimoton = load(ART_NIMOTON)
-	art_kassen = load(ART_KASSEN)
-	art_field_a = load(ART_FIELD_A)
-	art_field_b = load(ART_FIELD_B)
-	art_coin = load(ART_COIN)
-	field_texture = art_field_a if randi() % 2 == 0 else art_field_b
 	_build_hud()
 	_build_boss_hud()
 	_build_stick()
 	_build_choice()
+	_load_frames()
+	art_normal = _safe_load(ART_NORMAL)
+	art_fast = _safe_load(ART_FAST)
+	art_tank = _safe_load(ART_TANK)
+	art_nimoton = _safe_load(ART_NIMOTON)
+	art_kassen = _safe_load(ART_KASSEN)
+	art_field_a = _safe_load(ART_FIELD_A)
+	art_field_b = _safe_load(ART_FIELD_B)
+	art_coin = _safe_load(ART_COIN)
+	var fields: Array[Texture2D] = []
+	if art_field_a != null:
+		fields.append(art_field_a)
+	if art_field_b != null:
+		fields.append(art_field_b)
+	if fields.size() > 0:
+		field_texture = fields[randi() % fields.size()]
 	_follow_camera()
 
 
@@ -245,6 +261,7 @@ func _note_fx(dt: float) -> void:
 		_face.erase(id)
 		_flash.erase(id)
 		_bite.erase(id)
+		_last_state.erase(id)
 	for id in alive.keys():
 		var key := int(id)
 		var actor = alive[key]
@@ -262,6 +279,16 @@ func _note_fx(dt: float) -> void:
 		var delta := Vector2(actor.pos) - prev_pos
 		if absf(delta.x) > 0.4:
 			_face[key] = -1.0 if delta.x < 0.0 else 1.0
+		var state := str(actor.attack_state)
+		if str(_last_state.get(key, "")) != state:
+			_last_state[key] = state
+			if state.ends_with("_windup"):
+				_flash[key] = 0.16
+				_spawn_puff(Vector2(actor.pos) + Vector2(0.0, -50.0), Color(1.0, 0.85, 0.3, 0.8))
+		if actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_dash" and randf() < 0.3:
+			var dash: Vector2 = actor.target_pos - actor.pos
+			if dash.length() > 0.01:
+				_spawn_puff(actor.pos - dash.normalized() * 30.0, Color(1.0, 0.7, 0.4, 0.5))
 		_watch[key] = {"hp": actor.hp, "pos": actor.pos, "kind": actor.kind}
 	if just_hit:
 		_seen_attack = sim.attack_serial
@@ -432,7 +459,12 @@ func _draw() -> void:
 				tex = art_kassen
 				max_h = 280.0
 				max_w = 300.0
-			var head := _draw_posed(tex, foot, max_h, max_w, pose)
+			var head := 0.0
+			if tex != null:
+				head = _draw_posed(tex, foot, max_h, max_w, pose)
+			else:
+				draw_circle(foot, 20.0, Color(0.8, 0.2, 0.2))
+				head = foot.y - max_h
 			if Balance.BOSS_KINDS.has(actor.kind):
 				var boss_color := Color("baf05c") if actor.kind == Balance.KIND_NIMOTON else Color("ffd05d")
 				draw_string_outline(UiFont.font(), Vector2(foot.x - 110.0, head - 12.0), str(Balance.BOSS_NAME[actor.kind]), HORIZONTAL_ALIGNMENT_CENTER, 220.0, 24, 5, Color(0, 0, 0, 0.95))
@@ -452,7 +484,7 @@ func _load_frames() -> void:
 	var uniform := SaveStore.costume_of(_who) == "制服"
 	_frames = {}
 	for pose in ["idle", "walk_a", "walk_b", "wind", "hit"]:
-		_frames[pose] = load(Balance.pose_path(_who, pose, uniform))
+		_frames[pose] = _safe_load(Balance.pose_path(_who, pose, uniform))
 
 
 func _body() -> Dictionary:
@@ -618,24 +650,15 @@ func _enemy_pose(actor) -> Dictionary:
 		sx += charge * 0.16
 		sy -= charge * 0.22
 		face = -1.0 if actor.target_pos.x < actor.pos.x else 1.0
-		if actor.state_left < 0.1:
-			_flash[id] = 0.16
-			_spawn_puff(actor.pos + Vector2(face * 30.0, -40.0), Color(0.7, 1.0, 0.2, 0.8))
 	elif actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "empower_windup":
 		var pulse := 0.5 + 0.5 * sin(float(actor.state_left) * 16.0)
 		sx += pulse * 0.22
 		sy -= pulse * 0.15
 		hop = pulse * 8.0
-		if actor.state_left < 0.1:
-			_flash[id] = 0.16
-			_spawn_puff(actor.pos, Color(0.8, 1.0, 0.3, 0.9))
 	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "volley_windup":
 		hop = 16.0 + absf(sin(float(actor.state_left) * 11.0)) * 18.0
 		rot = face * -0.18
 		face = -1.0 if actor.target_pos.x < actor.pos.x else 1.0
-		if actor.state_left < 0.1:
-			_flash[id] = 0.16
-			_spawn_puff(actor.pos + Vector2(0.0, -60.0), Color(1.0, 0.85, 0.3, 0.8))
 	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_windup":
 		var crouch := clampf(1.0 - float(actor.state_left) / 0.68, 0.0, 1.0)
 		hop = 0.0
@@ -643,16 +666,12 @@ func _enemy_pose(actor) -> Dictionary:
 		sx -= crouch * 0.1
 		rot = face * (-0.12 - crouch * 0.2)
 		face = -1.0 if actor.target_pos.x < actor.pos.x else 1.0
-		if actor.state_left < 0.1:
-			_flash[id] = 0.16
-			_spawn_puff(actor.pos + Vector2(face * 40.0, 0.0), Color(1.0, 0.6, 0.25, 0.8))
 	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_dash":
 		var dash: Vector2 = actor.target_pos - actor.pos
 		if dash.length() > 0.01:
 			lunge = dash.normalized() * 120.0
 			rot = dash.angle() * 0.16
 			face = -1.0 if dash.x < 0.0 else 1.0
-			_spawn_puff(actor.pos - dash.normalized() * 30.0, Color(1.0, 0.7, 0.4, 0.5))
 	var bite := float(_bite.get(id, 0.0))
 	if bite > 0.0:
 		var toward := Vector2(sim.player_pos) - Vector2(actor.pos)
@@ -765,17 +784,15 @@ func _swing_dust() -> void:
 
 func _draw_coin(coin) -> void:
 	var bob := sin(sim.time * 7.0 + float(coin.id) * 1.3) * 4.0
-	var spot := Vector2(coin.pos) + Vector2(0.0, bob)
+	var base := Vector2(coin.pos)
+	_draw_shadow(base + Vector2(0.0, 12.0), 10.0)
+	var spot := base + Vector2(0.0, bob)
 	if art_coin:
-		draw_texture_rect(art_coin, Rect2(spot.x - 16.0, spot.y - 16.0, 32.0, 32.0))
+		draw_texture_rect(art_coin, Rect2(spot.x - 16.0, spot.y - 16.0, 32.0, 32.0), false)
 	else:
 		draw_circle(spot, 10.0, COIN_COLOR)
 		draw_arc(spot, 10.0, 0, TAU, 16, Color("8a6200"), 2.0, true)
 		draw_circle(spot + Vector2(-3.0, -3.0), 3.0, Color(1, 0.96, 0.75, 0.95))
-	# Shadow
-	draw_set_transform(spot, 0.0, Vector2(1.0, 0.3))
-	draw_circle(Vector2.ZERO, 10.0, Color(0, 0, 0, 0.2))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_puff(puff: Dictionary) -> void:
@@ -800,6 +817,8 @@ func _draw_stun_marks(head: Vector2, salt: int) -> void:
 
 
 func _draw_posed(tex: Texture2D, foot: Vector2, max_h: float, max_w: float, pose: Dictionary) -> float:
+	if tex == null:
+		return foot.y - max_h
 	var aspect := float(tex.get_width()) / float(tex.get_height())
 	var h := max_h
 	var w := h * aspect
@@ -815,7 +834,7 @@ func _draw_posed(tex: Texture2D, foot: Vector2, max_h: float, max_w: float, pose
 
 func _draw_ground() -> void:
 	if field_texture:
-		draw_texture_rect(field_texture, Rect2(0, 0, Balance.FIELD_W, Balance.FIELD_H))
+		draw_texture_rect(field_texture, Rect2(0, 0, Balance.FIELD_W, Balance.FIELD_H), false)
 	else:
 		draw_rect(Rect2(0, 0, Balance.FIELD_W, Balance.FIELD_H), GRASS, true)
 	var rim := Color("1e2a1c")
@@ -1054,20 +1073,20 @@ func _build_hud() -> void:
 	ui_layer.add_child(ui_root)
 	UiFont.full_rect(ui_root)
 
-	var special_margin := MarginContainer.new()
-	UiFont.full_rect(special_margin)
-	special_margin.add_theme_constant_override("margin_left", 24)
-	special_margin.add_theme_constant_override("margin_right", 24)
-	special_margin.add_theme_constant_override("margin_top", 24)
-	special_margin.add_theme_constant_override("margin_bottom", 24)
-	ui_root.add_child(special_margin)
+	var special_wrap := MarginContainer.new()
+	UiFont.full_rect(special_wrap)
+	special_wrap.add_theme_constant_override("margin_left", 24)
+	special_wrap.add_theme_constant_override("margin_right", 24)
+	special_wrap.add_theme_constant_override("margin_top", 24)
+	special_wrap.add_theme_constant_override("margin_bottom", 24)
+	ui_root.add_child(special_wrap)
 
 	var special_box := VBoxContainer.new()
 	special_box.add_theme_constant_override("separation", 4)
 	special_box.alignment = BoxContainer.ALIGNMENT_END
 	special_box.size_flags_horizontal = Control.SIZE_SHRINK_END
 	special_box.size_flags_vertical = Control.SIZE_SHRINK_END
-	special_margin.add_child(special_box)
+	special_wrap.add_child(special_box)
 
 	special_gauge = ProgressBar.new()
 	special_gauge.min_value = 0.0
@@ -1415,7 +1434,7 @@ func _build_choice() -> void:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 16)
-	col.vertical_alignment = BoxContainer.ALIGNMENT_CENTER
+	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	choice_margin.add_child(col)
 
 	var heading := UiFont.label("強化選択", 32 if _compact_layout else 40, UiFont.PAPER)
