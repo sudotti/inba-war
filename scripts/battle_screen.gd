@@ -212,7 +212,9 @@ func _input(event: InputEvent) -> void:
 		# タッチとマウスの到着順が前後しても、指を離したあとに歩き続けない。
 		_mouse_down = false
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if _touch_count == 0 and not DisplayServer.is_touchscreen_available():
+		if stick and stick.echoing_touch():
+			_mouse_down = false
+		elif _touch_count == 0 and not DisplayServer.is_touchscreen_available():
 			_mouse_down = event.pressed
 	elif event is InputEventKey and event.pressed and not event.echo and sim != null:
 		var key := int(event.physical_keycode)
@@ -1194,7 +1196,7 @@ func _build_stick() -> void:
 	_fill(root)
 	stick = Stick.new()
 	root.add_child(stick)
-	UiFont.full_rect(stick)
+	stick.place_bottom_left(get_viewport_rect().size)
 
 
 func _build_special_cut_in() -> void:
@@ -1354,6 +1356,9 @@ func _slide_special_streaks(dt: float) -> void:
 func _activate_special() -> void:
 	if sim == null or not sim.begin_special():
 		return
+	_mouse_down = false
+	if stick:
+		stick.guard_mouse_echo()
 	var palette := _special_palette()
 	_apply_cut_in_style(palette)
 	_special_phase = "intro"
@@ -1758,10 +1763,12 @@ func _show_build() -> void:
 	if build_root == null:
 		return
 	build_root.visible = true
+	build_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	if hint:
 		hint.visible = false
 	if stick:
 		stick.visible = false
+		stick.guard_mouse_echo()
 
 	for child in card_row.get_children():
 		child.queue_free()
@@ -1778,9 +1785,11 @@ func _show_build() -> void:
 func _hide_build() -> void:
 	build_shown = false
 	build_root.visible = false
-	build_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hint.visible = true
-	stick.visible = true
+	_mouse_down = false
+	if stick:
+		stick.visible = true
+		stick.guard_mouse_echo()
 
 
 func _card(index: int, id: String) -> Control:
