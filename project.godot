@@ -1,5 +1,10 @@
 ; Engine configuration file.
-; Godot 4.7.2 / 印旛村戦線 0.1.0
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -17,18 +22,17 @@ SaveStore="*res://scripts/save_store.gd"
 
 [display]
 
-window/size/viewport_width=390
-window/size/viewport_height=693
-window/size/window_width_override=1280
-window/size/window_height_override=720
-window/stretch/mode="2d"
-window/stretch/aspect="keep"
-window/handheld/orientation=6
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/size/window_width_override=720
+window/size/window_height_override=1280
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep_width"
+window/handheld/orientation=1
 
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
-anti_aliasing/quality/msaa_2d=0
 environment/defaults/default_clear_color=Color(0.02, 0.02, 0.04, 1)

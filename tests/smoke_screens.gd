@@ -49,35 +49,20 @@ func _check_layout() -> void:
 
 
 func _check_title() -> void:
-	var title := current
-	if _count_buttons(title) < 4:
-		print("TITLE portrait buttons < 4")
-		fails += 1
-	if not _has_menu(title, true):
-		print("TITLE portrait menu not vertical")
-		fails += 1
-	_clear_children(title)
-	title._portrait = false
-	title._build()
-	if _count_buttons(title) < 4:
-		print("TITLE landscape buttons < 4")
-		fails += 1
-	if not _has_menu(title, false):
-		print("TITLE landscape menu not horizontal")
+	if _count_buttons(current) < 5:
+		print("TITLE buttons < 5")
 		fails += 1
 
 
 func _check_select() -> void:
 	var select := current
-	select._is_portrait = true
 	var card: Control = select._card(Balance.CHAR_KENNY)
 	if card == null or card.get_child_count() == 0:
-		print("SELECT portrait card failed")
+		print("SELECT card failed")
 		fails += 1
-	select._is_portrait = false
-	var wide: Control = select._card(Balance.CHAR_TAKETCHI)
-	if wide == null or wide.get_child_count() == 0:
-		print("SELECT landscape card failed")
+	var other: Control = select._card(Balance.CHAR_TAKETCHI)
+	if other == null or other.get_child_count() == 0:
+		print("SELECT second card failed")
 		fails += 1
 
 
@@ -92,49 +77,34 @@ func _check_shop() -> void:
 
 func _check_battle() -> void:
 	var battle := current
-	battle._stacked_cards = false
-	battle._compact_layout = false
-	_rebuild_choice(battle)
-	if battle.card_row is not HBoxContainer:
-		print("BATTLE landscape card_row not HBox")
+	if battle.card_row == null or not battle.card_row is VBoxContainer:
+		print("BATTLE card row missing")
 		fails += 1
-	battle._stacked_cards = true
-	battle._compact_layout = true
-	_rebuild_choice(battle)
-	if battle.card_row is not VBoxContainer:
-		print("BATTLE portrait card_row not VBox")
+	if battle.hp_fill == null:
+		print("BATTLE hp bar missing")
+		fails += 1
+	if battle.timer_fill == null:
+		print("BATTLE timer bar missing")
+		fails += 1
+	if battle._gain == null:
+		print("BATTLE gain label missing")
 		fails += 1
 	var stacked_card: Control = battle._card(0, Balance.UPGRADES[0])
 	if stacked_card == null or stacked_card.get_child_count() == 0:
 		print("BATTLE stacked card failed")
 		fails += 1
-
-
-func _rebuild_choice(battle: Node) -> void:
-	if battle.build_root != null and battle.build_root.get_parent() != null:
-		battle.build_root.get_parent().free()
-	battle._build_choice()
-
-
-func _clear_children(node: Node) -> void:
-	for child in node.get_children():
-		node.remove_child(child)
-		child.free()
-
-
-func _has_menu(node: Node, want_vertical: bool) -> bool:
-	if node is BoxContainer:
-		var buttons := 0
-		for child in node.get_children():
-			if child is Button:
-				buttons += 1
-		if buttons == 4:
-			var is_vertical := node is VBoxContainer
-			return is_vertical == want_vertical
-	for child in node.get_children():
-		if _has_menu(child, want_vertical):
-			return true
-	return false
+	var button: Button = battle.special_button
+	var vp_h: float = battle.get_viewport_rect().size.y
+	var round_box := button.get_theme_stylebox("disabled") as StyleBoxFlat if button != null else null
+	if button == null or button.size.x < 120.0 or absf(button.size.x - button.size.y) > 1.0:
+		print("BATTLE special button is not a large disk")
+		fails += 1
+	elif button.position.y > vp_h - 180.0:
+		print("BATTLE special button sits too low")
+		fails += 1
+	elif round_box == null or round_box.get_corner_radius(CORNER_TOP_LEFT) < 60:
+		print("BATTLE special button is not round")
+		fails += 1
 
 
 func _count_buttons(node: Node) -> int:

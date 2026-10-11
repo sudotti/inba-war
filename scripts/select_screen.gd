@@ -21,80 +21,34 @@ var _closet: Control
 var _closet_name: Label
 var _closet_list: VBoxContainer
 var _closet_who := ""
-var _is_portrait := false
 var _main_margin: MarginContainer
 var _main_container: Control
-var _rebuild_pending := false
-var _orientation_timer := 0.0
 
 
 func _ready() -> void:
-	_is_portrait = _get_current_orientation()
-
 	# Persistent background
 	var night := ColorRect.new()
 	night.color = Color(0.05, 0.04, 0.08, 1.0)
-	night.anchors_preset = Control.PRESET_FULL_RECT
 	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(night)
+	night.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	# Persistent safe area margin
 	_main_margin = MarginContainer.new()
-	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
 	_main_margin.add_theme_constant_override("margin_left", 24)
 	_main_margin.add_theme_constant_override("margin_right", 24)
+	_main_margin.add_theme_constant_override("margin_top", 24)
+	_main_margin.add_theme_constant_override("margin_bottom", 24)
 	add_child(_main_margin)
+	_main_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	# Fixed container that stays alive - only its children are rebuilt
 	_main_container = VBoxContainer.new()
-	_main_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_main_container.add_theme_constant_override("separation", 12)
-	_main_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_main_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_main_margin.add_child(_main_container)
 
 	_fill()
 	_build_closet()
-
-
-func _process(delta: float) -> void:
-	_orientation_timer -= delta
-	if _orientation_timer > 0.0:
-		return
-	var current := _get_current_orientation()
-	if current != _is_portrait and not _rebuild_pending:
-		_is_portrait = current
-		_orientation_timer = 0.5  # Debounce
-		_rebuild_pending = true
-		call_deferred("_do_refill")
-
-
-func _do_refill() -> void:
-	# Clear only the children of the fixed container
-	for child in _main_container.get_children():
-		_main_container.remove_child(child)
-		child.queue_free()
-	# Reapply safe area padding for new orientation
-	_fill()
-	_rebuild_pending = false
-
-
-func _get_current_orientation() -> bool:
-	# Get actual window size (not viewport)
-	var win_size := Vector2.ZERO
-	
-	# Desktop: use DisplayServer
-	var methods := DisplayServer.get_method_list()
-	for m in methods:
-		if m.name == "window_get_size":
-			win_size = DisplayServer.window_get_size()
-			break
-	
-	# Fallback to viewport (fixed size in stretch mode)
-	if win_size == Vector2.ZERO:
-		win_size = get_viewport().get_visible_rect().size
-	
-	return win_size.y > win_size.x
 
 
 func _fill() -> void:
@@ -109,6 +63,7 @@ func _fill() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 240)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	_main_container.add_child(scroll)
@@ -223,7 +178,8 @@ func _add_card_actions(target: Control, who: String) -> void:
 		go.custom_minimum_size = Vector2(0, 56)
 		go.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		go.pressed.connect(func() -> void:
-			pass
+			SaveStore.shop_return = "res://scenes/select.tscn"
+			get_tree().change_scene_to_file("res://scenes/shop.tscn")
 		)
 		target.add_child(go)
 
@@ -267,14 +223,14 @@ func _build_closet() -> void:
 	_closet = Control.new()
 	_closet.visible = false
 	_closet.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_closet.anchors_preset = Control.PRESET_FULL_RECT
 	add_child(_closet)
+	_closet.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.62)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	dim.anchors_preset = Control.PRESET_FULL_RECT
 	_closet.add_child(dim)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var panel := PanelContainer.new()
 	panel.anchor_left = 0.5

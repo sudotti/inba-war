@@ -57,9 +57,9 @@ func _balance() -> void:
 	_eq(Balance.kind_for_roll(10.0, 0.0), Balance.KIND_NORMAL, "early kind")
 	_eq(Balance.kind_for_roll(50.0, 0.19), Balance.KIND_FAST, "fast roll")
 	_eq(Balance.kind_for_roll(50.0, 0.20), Balance.KIND_NORMAL, "normal roll")
-	_near(float(Balance.spawn_profile(44.9).interval), 0.90, "interval 44")
-	_near(float(Balance.spawn_profile(45.0).interval), 0.70, "interval 45")
-	_near(float(Balance.spawn_profile(120.0).interval), 0.42, "interval 120")
+	_near(float(Balance.spawn_profile(44.9).interval), 0.60, "interval 44")
+	_near(float(Balance.spawn_profile(45.0).interval), 0.47, "interval 45")
+	_near(float(Balance.spawn_profile(120.0).interval), 0.28, "interval 120")
 	_near(float(Balance.spawn_profile(75.0).fast), 0.30, "fast 75")
 	var massa: Dictionary = Balance.CHARACTERS[Balance.CHAR_MASSA]
 	var boar: Dictionary = Balance.ENEMIES[Balance.KIND_FAST]
@@ -69,7 +69,6 @@ func _balance() -> void:
 	_true(float(take.speed) < float(boar.speed), "fast enemy outruns takechi")
 	_true(float(take.speed) > float(massa.speed), "takechi outruns massa")
 	_true(float(kenny.speed) > float(boar.speed), "kenny faster than boar")
-	_eq(Balance.CONE_POINTS.size(), 9, "9 cones")
 	_eq(Balance.UPGRADES.size(), 9, "9 builds")
 	_near(Balance.puritora_radius(1), 160.0, "puri radius 1")
 	_near(Balance.puritora_radius(5), 304.0, "puri radius 5")
@@ -201,6 +200,23 @@ func _specials() -> void:
 		kassen._move_boss(kassen_actor, 0.05)
 	_true(kassen.player_hp < 100, "kassen kick dash hits")
 
+	var teacher_sim = BattleSim.new()
+	teacher_sim.time = 2.0
+	teacher_sim.attacks_enabled = false
+	teacher_sim.spawns_enabled = false
+	var teacher = teacher_sim._make_actor(Balance.KIND_TEACHER, teacher_sim.time)
+	teacher.pos = teacher_sim.player_pos + Vector2(160, 0)
+	teacher.attack_state = "slide_windup"
+	teacher.state_left = 0.02
+	teacher.target_pos = teacher_sim.player_pos
+	teacher_sim.enemies.append(teacher)
+	teacher_sim._move_teacher(teacher, 0.05)
+	_eq(teacher.attack_state, "slide_dash", "teacher slides")
+	var teacher_hp: int = teacher_sim.player_hp
+	for _slide in 12:
+		teacher_sim._move_teacher(teacher, 0.05)
+	_true(teacher_sim.player_hp < teacher_hp, "teacher slide hits")
+
 	var raid = BattleSim.new()
 	raid.rng.seed = 17
 	raid.view_rect = Rect2(raid.player_pos - Vector2(20, 20), Vector2(40, 40))
@@ -213,38 +229,6 @@ func _specials() -> void:
 
 func _combat() -> void:
 	var sim = BattleSim.new()
-	_eq(sim.cones.size(), 9, "cones placed")
-	_near(sim.player_pos.x, 800.0, "start x")
-	_near(sim.player_pos.y, 550.0, "start y")
-
-	sim.attacks_enabled = false
-	sim.contact_enabled = false
-	sim.spawns_enabled = false
-	sim.player_pos = Vector2(520, 536)
-	sim.step(2.0, Vector2.LEFT)
-	_true(sim.player_pos.distance_to(Vector2(400, 536)) >= 43.9, "player stopped by cone")
-	_true(sim.player_pos.x > 400.0, "player did not pass cone")
-
-	sim = BattleSim.new()
-	sim.attacks_enabled = false
-	sim.contact_enabled = false
-	sim.spawns_enabled = false
-	var walker = sim.debug_place(Balance.KIND_NORMAL, Vector2(520, 536), 12, 80.0)
-	sim.player_pos = Vector2(160, 536)
-	sim.step(3.0, Vector2.ZERO)
-	_true(walker.pos.distance_to(Vector2(400, 536)) >= 37.8, "enemy stopped by cone")
-	_true(walker.pos.x > 400.0, "enemy did not pass cone")
-
-	sim = BattleSim.new()
-	sim.contact_enabled = false
-	sim.spawns_enabled = false
-	sim.player_pos = Vector2(520, 536)
-	var pushed = sim.debug_place(Balance.KIND_NORMAL, Vector2(470, 536), 100, 0.0)
-	sim.step(1.0, Vector2.ZERO)
-	_near(pushed.pos.x, 438.0, "knockback stops at cone")
-	_near(pushed.pos.y, 536.0, "knockback y")
-
-	sim = BattleSim.new()
 	sim.contact_enabled = false
 	sim.spawns_enabled = false
 	var kaiju = sim.debug_place(Balance.KIND_TANK, sim.player_pos + Vector2(100, 0), 200, 0.0)
@@ -447,8 +431,8 @@ func _spawn_and_round() -> void:
 	sim.rng.seed = 1
 	sim.attacks_enabled = false
 	sim.contact_enabled = false
-	sim.step(0.89, Vector2.ZERO)
-	_eq(sim.enemies.size(), 0, "quiet before 0.9")
+	sim.step(0.59, Vector2.ZERO)
+	_eq(sim.enemies.size(), 0, "quiet before 0.6")
 	sim.step(0.02, Vector2.ZERO)
 	_eq(sim.enemies.size(), 1, "first spawn")
 	if sim.enemies.size() == 1:
@@ -464,7 +448,12 @@ func _spawn_and_round() -> void:
 	sim.attacks_enabled = false
 	sim.contact_enabled = false
 	sim.regular_spawns_enabled = false
-	sim.step(74.9, Vector2.ZERO)
+	sim.boss_spawn_attempted = true
+	sim.step(59.4, Vector2.ZERO)
+	_eq(_count_kind(sim, Balance.KIND_TEACHER), 0, "no teacher before 60")
+	sim.step(0.7, Vector2.ZERO)
+	_eq(_count_kind(sim, Balance.KIND_TEACHER), 1, "teacher at 60")
+	sim.step(14.8, Vector2.ZERO)
 	_eq(_count_kind(sim, Balance.KIND_TANK), 0, "no kaiju before 75")
 	sim.step(0.2, Vector2.ZERO)
 	_eq(_count_kind(sim, Balance.KIND_TANK), 1, "kaiju at 75")
@@ -670,7 +659,8 @@ func _kite() -> void:
 		int(sim.kills_of[Balance.KIND_FAST]),
 		int(sim.kills_of[Balance.KIND_TANK]),
 		int(sim.kills_of[Balance.KIND_NIMOTON]),
-		int(sim.kills_of[Balance.KIND_KASSEN])
+		int(sim.kills_of[Balance.KIND_KASSEN]),
+		int(sim.kills_of[Balance.KIND_TEACHER])
 	), "kite score")
 	_true(sim.max_alive_seen <= 60, "kite cap")
 	_true(sim.player_pos.x >= sim.player_radius - 0.1, "player in field")

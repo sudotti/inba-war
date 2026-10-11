@@ -111,6 +111,9 @@ func _build() -> void:
 		var bosses := int(result.get("kills_nimoton", 0)) + int(result.get("kills_kassen", 0))
 		if bosses > 0:
 			col.add_child(UiFont.label("ボス撃破  ニーモトン %d / カッセン %d" % [int(result.get("kills_nimoton", 0)), int(result.get("kills_kassen", 0))], 18, UiFont.BRASS))
+		var teachers := int(result.get("kills_teacher", 0))
+		if teachers > 0:
+			col.add_child(UiFont.label("先生撃破  %d" % teachers, 18, UiFont.BRASS))
 
 	_fragment = UiFont.label("", 22, UiFont.YELLOW)
 	_fragment.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

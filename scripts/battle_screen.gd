@@ -21,6 +21,8 @@ const ART_KASSEN := "res://assets/battle/boss_kassen.png"
 const ART_FIELD_A := "res://assets/battle/field_a.png"
 const ART_FIELD_B := "res://assets/battle/field_b.png"
 const ART_COIN := "res://assets/battle/coin.png"
+const ART_TEACHER := "res://assets/battle/teacher.png"
+const CARD_H := 156.0
 
 var sim
 var camera: Camera2D
@@ -33,6 +35,7 @@ var art_kassen: Texture2D
 var art_field_a: Texture2D
 var art_field_b: Texture2D
 var art_coin: Texture2D
+var art_teacher: Texture2D
 var field_texture: Texture2D
 
 var time_label: Label
@@ -75,7 +78,7 @@ var _bite: Dictionary = {}
 var _puffs: Array[Dictionary] = []
 var _last_state: Dictionary = {}
 var special_button: Button
-var special_gauge: ProgressBar
+var _special_look := ""
 var _special_cut_in: Control
 var _special_face: TextureRect
 var _special_name: Label
@@ -96,12 +99,12 @@ var _boss_banner_name: Label
 var _boss_banner_action: Label
 var _boss_banner_tween: Tween
 var _seen_boss_alert := 0
-var _compact_layout := true
-var _stacked_cards := true
-var _stacked_card_h := 104.0
-var _hud_margin: MarginContainer
 var _boss_margin: MarginContainer
 var _special_margin: MarginContainer
+
+
+func _fill(c: Control) -> void:
+	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
 func _safe_load(path: String) -> Texture2D:
@@ -126,6 +129,7 @@ func _ready() -> void:
 	_build_stick()
 	_build_choice()
 	_load_frames()
+	_build_special_cut_in()
 	art_normal = _safe_load(ART_NORMAL)
 	art_fast = _safe_load(ART_FAST)
 	art_tank = _safe_load(ART_TANK)
@@ -134,6 +138,7 @@ func _ready() -> void:
 	art_field_a = _safe_load(ART_FIELD_A)
 	art_field_b = _safe_load(ART_FIELD_B)
 	art_coin = _safe_load(ART_COIN)
+	art_teacher = _safe_load(ART_TEACHER)
 	var fields: Array[Texture2D] = []
 	if art_field_a != null:
 		fields.append(art_field_a)
@@ -381,11 +386,25 @@ func _draw_boss_telegraphs() -> void:
 			var target: Vector2 = actor.target_pos
 			draw_arc(target, 34.0 + sin(_anim * 16.0) * 8.0, 0.0, TAU, 40, Color(1.0, 0.78, 0.25, 0.9), 5.0, true)
 			draw_line(actor.pos, target, Color(1.0, 0.9, 0.55, 0.68), 4.0, true)
+		elif actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "empower_windup":
+			var pulse := 0.82 + 0.18 * sin(_anim * 14.0)
+			draw_arc(actor.pos, 132.0 * pulse, 0.0, TAU, 56, Color(0.82, 1.0, 0.38, 0.78), 5.0, true)
+			draw_arc(actor.pos, 210.0 + sin(_anim * 9.0) * 10.0, _anim * 2.2, _anim * 2.2 + TAU * 0.72, 40, Color(0.95, 0.86, 0.32, 0.62), 4.0, true)
+			for i in 6:
+				var angle := _anim * 2.6 + float(i) * TAU / 6.0
+				var mote: Vector2 = Vector2(actor.pos) + Vector2.from_angle(angle) * (78.0 + sin(_anim * 11.0 + float(i)) * 14.0)
+				draw_circle(mote, 7.0, Color(0.96, 1.0, 0.55, 0.82))
 		elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_windup":
 			var direction: Vector2 = (actor.target_pos - actor.pos).normalized()
 			var side := direction.orthogonal() * 24.0
 			for offset in [-1.0, 0.0, 1.0]:
 				draw_line(actor.pos + side * offset, actor.target_pos + side * offset, Color(1.0, 0.4, 0.23, 0.72 - absf(offset) * 0.15), 8.0 - absf(offset) * 2.0, true)
+		elif actor.kind == Balance.KIND_TEACHER and actor.attack_state == "slide_windup":
+			var aim: Vector2 = actor.target_pos - actor.pos
+			if aim.length() > 0.01:
+				var direction := aim.normalized()
+				draw_line(actor.pos, actor.pos + direction * 240.0, Color(0.95, 0.82, 0.42, 0.85), 7.0, true)
+				draw_arc(actor.target_pos, 28.0 + sin(_anim * 16.0) * 6.0, 0.0, TAU, 32, Color(0.95, 0.82, 0.42, 0.9), 4.0, true)
 
 
 func _draw() -> void:
@@ -459,6 +478,10 @@ func _draw() -> void:
 				tex = art_kassen
 				max_h = 280.0
 				max_w = 300.0
+			elif actor.kind == Balance.KIND_TEACHER:
+				tex = art_teacher
+				max_h = 210.0
+				max_w = 168.0
 			var head := 0.0
 			if tex != null:
 				head = _draw_posed(tex, foot, max_h, max_w, pose)
@@ -556,6 +579,7 @@ func _player_visual() -> Dictionary:
 
 
 func _draw_special_aura() -> void:
+	_draw_special_flames()
 	if _special_phase == "motion" and _special_motion_left > 0.0:
 		var progress := 1.0 - _special_motion_left / _special_motion_duration
 		var aim := _aim.normalized() if _aim.length() > 0.01 else Vector2.RIGHT
@@ -600,6 +624,34 @@ func _draw_special_aura() -> void:
 			_draw_posed(tex, sim.player_pos + Vector2(0, -4), _sprite_h(), 480.0, pose)
 
 
+func _draw_special_flames() -> void:
+	var motion := _special_phase == "motion" and _special_motion_left > 0.0
+	var lasting: bool = float(sim.special_active_left) > 0.0 or _special_ring_left > 0.0
+	if not motion and not lasting:
+		return
+	var strength := 1.15 if motion else 0.78
+	var origin: Vector2 = Vector2(sim.player_pos) + Vector2(0.0, -18.0)
+	var base_r := 36.0 if _who == Balance.CHAR_KENNY else 44.0
+	draw_circle(origin, base_r + 16.0 * strength, Color(1.0, 0.38, 0.06, 0.14 * strength))
+	for i in 10:
+		var spin := _anim * (1.35 if motion else 0.7)
+		var angle := float(i) / 10.0 * TAU + spin
+		var wobble := sin(_anim * 11.0 + float(i) * 1.9) * 0.42
+		var flicker := 0.45 + 0.55 * absf(sin(_anim * 17.0 + float(i) * 2.4))
+		var dir := Vector2.from_angle(angle + wobble)
+		var inner := base_r * (0.5 + 0.2 * sin(_anim * 8.0 + float(i)))
+		var tongue := (18.0 + flicker * 40.0) * strength
+		var root: Vector2 = origin + dir * inner
+		var tip: Vector2 = origin + dir * (inner + tongue) + Vector2(sin(_anim * 13.0 + float(i)) * 7.0, -flicker * 10.0)
+		var side := dir.orthogonal() * (5.0 + flicker * 5.5)
+		draw_colored_polygon(PackedVector2Array([root + side, root - side, tip]), Color(1.0, 0.3 + flicker * 0.32, 0.05, 0.26 + flicker * 0.5))
+		draw_colored_polygon(PackedVector2Array([
+			root + side * 0.36,
+			root - side * 0.36,
+			root + dir * (tongue * 0.42) + Vector2(0.0, -4.0),
+		]), Color(1.0, 0.92, 0.6, 0.32 + flicker * 0.42))
+
+
 func _enemy_pose(actor) -> Dictionary:
 	var id := int(actor.id)
 	var born := float(_born.get(id, sim.time))
@@ -630,6 +682,11 @@ func _enemy_pose(actor) -> Dictionary:
 		amp = 18.0
 		squash = 0.1
 		lean = 0.16
+	elif actor.kind == Balance.KIND_TEACHER:
+		rate = 6.5
+		amp = 8.0
+		squash = 0.05
+		lean = 0.08
 	var phase: float = float(sim.time) * rate + float(id) * 0.7
 	var hop := 0.0 if stunned else absf(sin(phase)) * amp
 	var sx := 1.0
@@ -672,6 +729,19 @@ func _enemy_pose(actor) -> Dictionary:
 			lunge = dash.normalized() * 120.0
 			rot = dash.angle() * 0.16
 			face = -1.0 if dash.x < 0.0 else 1.0
+	elif actor.kind == Balance.KIND_TEACHER and actor.attack_state == "slide_windup":
+		var crouch := clampf(1.0 - float(actor.state_left) / 0.48, 0.0, 1.0)
+		hop = 0.0
+		sy += crouch * 0.16
+		rot = face * (-0.2 - crouch * 0.25)
+		face = -1.0 if actor.target_pos.x < actor.pos.x else 1.0
+	elif actor.kind == Balance.KIND_TEACHER and actor.attack_state == "slide_dash":
+		var dash: Vector2 = actor.target_pos - actor.pos
+		if dash.length() > 0.01:
+			lunge = dash.normalized() * 80.0
+			rot = dash.angle() * 0.22
+			face = -1.0 if dash.x < 0.0 else 1.0
+			hop = 4.0
 	var bite := float(_bite.get(id, 0.0))
 	if bite > 0.0:
 		var toward := Vector2(sim.player_pos) - Vector2(actor.pos)
@@ -886,7 +956,7 @@ func _sync_hud() -> void:
 	time_label.text = "残り  %s" % _clock(remain)
 	hp_label.text = "体力  %d / %d" % [sim.player_hp, sim.player_max_hp]
 	var ratio := 0.0 if sim.player_max_hp <= 0 else clampf(float(sim.player_hp) / float(sim.player_max_hp), 0.0, 1.0)
-	hp_fill.anchor_right = ratio
+	hp_fill.size = Vector2(220.0 * ratio, 12.0)
 	var healthy := Color("b7c4c2")
 	if _who == Balance.CHAR_MASSA:
 		healthy = Color("f3ead2")
@@ -913,196 +983,90 @@ func _clock(remain: float) -> String:
 
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
-	layer.layer = 4
+	layer.layer = 10
 	add_child(layer)
+
 	var root := Control.new()
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.offset_left = 0
+	root.offset_top = 0
+	root.offset_right = 0
+	root.offset_bottom = 0
 	layer.add_child(root)
-	UiFont.full_rect(root)
 
-	_hud_margin = MarginContainer.new()
-	_hud_margin.anchors_preset = Control.PRESET_FULL_RECT
-	_hud_margin.add_theme_constant_override("margin_left", 24)
-	_hud_margin.add_theme_constant_override("margin_right", 24)
-	root.add_child(_hud_margin)
+	var vp := get_viewport_rect().size
 
-	var main_col := VBoxContainer.new()
-	main_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	main_col.add_theme_constant_override("separation", 8)
-	main_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_hud_margin.add_child(main_col)
+	# 左上の情報
+	time_label = UiFont.label("残り  3:00", 28, UiFont.PAPER)
+	time_label.position = Vector2(24, 20)
+	root.add_child(time_label)
 
-	# Top bar
-	var bar := PanelContainer.new()
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var hud_style := UiFont.style(Color(0.07, 0.08, 0.1, 0.94), Color(1, 0.95, 0.82, 0.7), 3, 18)
-	hud_style.content_margin_top = 4 if _compact_layout else 6
-	hud_style.content_margin_bottom = 4 if _compact_layout else 6
-	hud_style.content_margin_left = 24
-	hud_style.content_margin_right = 24
-	bar.add_theme_stylebox_override("panel", hud_style)
-	main_col.add_child(bar)
+	hp_label = UiFont.label("体力  100 / 100", 20, UiFont.PAPER)
+	hp_label.position = Vector2(24, 60)
+	root.add_child(hp_label)
 
-	var box := VBoxContainer.new()
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_theme_constant_override("separation", 2 if _compact_layout else 0)
-	bar.add_child(box)
-	var row := HBoxContainer.new()
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 4 if _compact_layout else 18)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_child(row)
-
-	var face := UiFont.cropped(_portrait_path(_who))
-	var atlas := AtlasTexture.new()
-	atlas.atlas = face
-	var tw := face.get_width()
-	var th := face.get_height()
-	atlas.region = Rect2(tw * 0.12, 0, tw * 0.76, th * 0.4)
-	var chip := TextureRect.new()
-	chip.texture = atlas
-	chip.custom_minimum_size = Vector2(40, 40) if _compact_layout else Vector2(48, 48)
-	chip.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	chip.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(chip)
-
-	var who_label := UiFont.label(_who, 18 if _compact_layout else 22, UiFont.YELLOW)
-	who_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	who_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(who_label)
-
-	# Spacer to push home button to the right
-	var home_spacer := Control.new()
-	home_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	home_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(home_spacer)
-
-	# Home button at top-right
-	var home_btn := UiFont.button("ホーム", 14 if _compact_layout else 16)
-	home_btn.custom_minimum_size = Vector2(96, 44)
-	home_btn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	home_btn.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/title.tscn")
-	)
-	row.add_child(home_btn)
-
-	time_label = UiFont.label("残り  3:00", 22 if _compact_layout else 30, UiFont.PAPER)
-	score_label = UiFont.label("得点  0", 18 if _compact_layout else 22, UiFont.PAPER)
-	coin_label = UiFont.label("コイン  0", 18 if _compact_layout else 22, UiFont.YELLOW)
-	hp_label = UiFont.label("体力  100 / 100", 17 if _compact_layout else 20, UiFont.PAPER)
-	for node in [time_label, hp_label, score_label, coin_label]:
-		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		node.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-
-	var hp_box := VBoxContainer.new()
-	hp_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hp_box.custom_minimum_size = Vector2(176, 0) if _compact_layout else Vector2(240, 0)
-	hp_box.add_child(hp_label)
-	var track := Control.new()
-	track.custom_minimum_size = Vector2(160, 10) if _compact_layout else Vector2(220, 12)
-	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hp_box.add_child(track)
-	var back := ColorRect.new()
-	back.color = Color(0, 0, 0, 0.45)
-	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(back)
-	track.add_child(back)
+	var hp_track := ColorRect.new()
+	hp_track.color = Color(0, 0, 0, 0.55)
+	hp_track.position = Vector2(24, 90)
+	hp_track.size = Vector2(220, 12)
+	hp_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(hp_track)
 	hp_fill = ColorRect.new()
-	hp_fill.color = UiFont.CREAM
+	hp_fill.color = Color("f3ead2")
 	hp_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hp_fill.anchor_left = 0
-	hp_fill.anchor_top = 0
-	hp_fill.anchor_bottom = 1
-	hp_fill.anchor_right = 1
-	track.add_child(hp_fill)
+	hp_fill.position = Vector2(24, 90)
+	hp_fill.size = Vector2(220, 12)
+	root.add_child(hp_fill)
 
-	if _compact_layout:
-		var second := HBoxContainer.new()
-		second.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		second.add_theme_constant_override("separation", 4)
-		second.alignment = BoxContainer.ALIGNMENT_CENTER
-		box.add_child(second)
-		row.add_child(time_label)
-		second.add_child(hp_box)
-		second.add_child(score_label)
-		second.add_child(coin_label)
-	else:
-		row.add_child(hp_box)
-		row.add_child(time_label)
-		row.add_child(score_label)
-		row.add_child(coin_label)
+	score_label = UiFont.label("スコア  0", 20, UiFont.PAPER)
+	score_label.position = Vector2(24, 112)
+	root.add_child(score_label)
 
-	# Spacer to push bottom elements down
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_col.add_child(spacer)
+	coin_label = UiFont.label("コイン  0", 20, UiFont.YELLOW)
+	coin_label.position = Vector2(24, 144)
+	root.add_child(coin_label)
 
-	# Hint at bottom
-	var motion := "鉄パイプ  広範囲攻撃"
-	if _who == Balance.CHAR_TAKETCHI:
-		motion = "拳  近距離・高威力"
-	elif _who == Balance.CHAR_KENNY:
-		motion = "キック  高速移動"
-	hint = UiFont.label(motion, 18, Color(1, 1, 1, 0.94))
+	# ホームボタン（右上）
+	var home_btn := UiFont.button("ホーム", 16)
+	home_btn.custom_minimum_size = Vector2(120, 48)
+	home_btn.size = Vector2(120, 48)
+	home_btn.position = Vector2(vp.x - 140, 20)
+	home_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
+	root.add_child(home_btn)
+
+	# 必殺技ボタン。丸くして、右下の端から少し上げる。
+	var disk := 132.0
+	special_button = UiFont.button("必殺", 22)
+	special_button.custom_minimum_size = Vector2(disk, disk)
+	special_button.size = Vector2(disk, disk)
+	special_button.position = Vector2(vp.x - 24.0 - disk, vp.y - 78.0 - disk)
+	special_button.pivot_offset = Vector2(disk, disk) * 0.5
+	special_button.focus_mode = Control.FOCUS_NONE
+	special_button.add_theme_color_override("font_disabled_color", Color("f6e2ad"))
+	special_button.add_theme_constant_override("outline_size", 5)
+	special_button.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.72))
+	special_button.pressed.connect(_activate_special)
+	root.add_child(special_button)
+	_apply_special_style(false, false)
+
+	# 下部のヒントなど
+	hint = UiFont.label(_attack_hint(), 18, Color.WHITE)
+	hint.position = Vector2(24, vp.y - 40)
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	main_col.add_child(hint)
+	root.add_child(hint)
 
 	build_line = UiFont.label("", 18, UiFont.YELLOW)
+	build_line.position = Vector2(24, vp.y - 70)
 	build_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	build_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	main_col.add_child(build_line)
+	root.add_child(build_line)
 
-	# Gain label (centered overlay)
-	_gain = UiFont.label("", 40, UiFont.YELLOW)
-	_gain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_gain = UiFont.label("", 36, UiFont.YELLOW)
 	_gain.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_gain.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_gain.position = Vector2(0, vp.y * 0.42)
+	_gain.size = Vector2(vp.x, 56)
 	_gain.modulate.a = 0.0
-	UiFont.full_rect(_gain)
+	_gain.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_gain)
-
-	# Special gauge and button (bottom right) - layer 8 to be above stick (5) and boss HUD (7)
-	var ui_layer := CanvasLayer.new()
-	ui_layer.layer = 8
-	add_child(ui_layer)
-	var ui_root := Control.new()
-	ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ui_layer.add_child(ui_root)
-	UiFont.full_rect(ui_root)
-
-	var special_wrap := MarginContainer.new()
-	UiFont.full_rect(special_wrap)
-	special_wrap.add_theme_constant_override("margin_left", 24)
-	special_wrap.add_theme_constant_override("margin_right", 24)
-	special_wrap.add_theme_constant_override("margin_top", 24)
-	special_wrap.add_theme_constant_override("margin_bottom", 24)
-	ui_root.add_child(special_wrap)
-
-	var special_box := VBoxContainer.new()
-	special_box.add_theme_constant_override("separation", 4)
-	special_box.alignment = BoxContainer.ALIGNMENT_END
-	special_box.size_flags_horizontal = Control.SIZE_SHRINK_END
-	special_box.size_flags_vertical = Control.SIZE_SHRINK_END
-	special_wrap.add_child(special_box)
-
-	special_gauge = ProgressBar.new()
-	special_gauge.min_value = 0.0
-	special_gauge.max_value = Balance.SPECIAL_GAUGE_MAX
-	special_gauge.show_percentage = false
-	special_gauge.custom_minimum_size = Vector2(200, 14)
-	special_gauge.add_theme_stylebox_override("background", UiFont.style(Color(0.05, 0.05, 0.05, 0.88), Color("c8a456"), 2, 7))
-	special_gauge.add_theme_stylebox_override("fill", UiFont.style(Color("d7b072"), Color("fff0c2"), 1, 6))
-	special_box.add_child(special_gauge)
-	special_button = UiFont.button("必殺技 0%", 16 if _compact_layout else 18)
-	special_button.custom_minimum_size = Vector2(200, 54)
-	special_button.pressed.connect(_activate_special)
-	special_button.add_theme_stylebox_override("disabled", UiFont.style(Color("24201b"), Color("68583b"), 2, 12))
-	special_button.add_theme_color_override("font_disabled_color", Color("c7b991"))
-	special_box.add_child(special_button)
-	_build_special_cut_in()
 
 
 func _build_stick() -> void:
@@ -1112,7 +1076,7 @@ func _build_stick() -> void:
 	var root := Control.new()
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
-	UiFont.full_rect(root)
+	_fill(root)
 	stick = Stick.new()
 	root.add_child(stick)
 	UiFont.full_rect(stick)
@@ -1129,10 +1093,10 @@ func _build_special_cut_in() -> void:
 	layer.add_child(_special_cut_in)
 
 	_special_margin = MarginContainer.new()
-	_special_margin.anchors_preset = Control.PRESET_FULL_RECT
+	_special_cut_in.add_child(_special_margin)
+	_fill(_special_margin)
 	_special_margin.add_theme_constant_override("margin_left", 24)
 	_special_margin.add_theme_constant_override("margin_right", 24)
-	_special_cut_in.add_child(_special_margin)
 
 	var dim := ColorRect.new()
 	dim.color = Color(0.02, 0.02, 0.03, 0.42)
@@ -1253,19 +1217,74 @@ func _special_burst(near_color: Color, far_color: Color, count: int, min_speed: 
 		})
 
 
+func _round_style(fill: Color, border: Color, width: int, glow: float) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = fill
+	box.border_color = border
+	box.set_border_width_all(width)
+	box.set_corner_radius_all(66)
+	box.content_margin_left = 12
+	box.content_margin_right = 12
+	box.content_margin_top = 34
+	box.content_margin_bottom = 26
+	box.shadow_color = Color(1.0, 0.52, 0.1, glow)
+	box.shadow_size = 12 if glow > 0.15 else 0
+	return box
+
+
+func _apply_special_style(active: bool, ready: bool) -> void:
+	var look := "hot" if active else ("ready" if ready else "idle")
+	if look == _special_look and special_button.has_theme_stylebox_override("normal"):
+		return
+	_special_look = look
+	var normal: StyleBoxFlat
+	var hover: StyleBoxFlat
+	var pressed: StyleBoxFlat
+	if look == "ready":
+		normal = _round_style(Color("f0d28a"), Color("fff6d2"), 5, 0.62)
+		hover = _round_style(Color("ffe7a8"), Color("fff8dc"), 5, 0.75)
+		pressed = _round_style(Color("e2b45a"), Color("f0d28a"), 5, 0.35)
+	elif look == "hot":
+		normal = _round_style(Color("8c3018"), Color("ffb15a"), 5, 0.7)
+		hover = normal
+		pressed = normal
+	else:
+		normal = _round_style(Color("1a140f"), Color("d8b26c"), 4, 0.32)
+		hover = _round_style(Color("2a2016"), Color("f0d28a"), 4, 0.42)
+		pressed = normal
+	special_button.add_theme_stylebox_override("normal", normal)
+	special_button.add_theme_stylebox_override("hover", hover)
+	special_button.add_theme_stylebox_override("pressed", pressed)
+	special_button.add_theme_stylebox_override("focus", normal)
+	special_button.add_theme_stylebox_override("disabled", normal)
+
+
 func _update_special_hud() -> void:
 	if sim == null or special_button == null:
 		return
-	special_gauge.value = sim.special_charge
 	var percent := int(roundf(sim.special_charge))
-	if sim.special_active_left > 0.0:
-		special_button.text = "必殺技  %.1f秒" % sim.special_active_left
-	elif sim.special_charge >= Balance.SPECIAL_GAUGE_MAX:
-		special_button.text = "必殺技 発動" if _compact_layout else "必殺技 発動 [Space]"
+	var active: bool = float(sim.special_active_left) > 0.0
+	var ready: bool = sim.can_activate_special()
+	if active:
+		special_button.text = "%.1f\n秒" % sim.special_active_left
+	elif ready:
+		special_button.text = "発動"
 	else:
-		special_button.text = "必殺技 %d%%" % percent if _compact_layout else "必殺技 %d%% [Space]" % percent
-	special_button.disabled = not sim.can_activate_special()
-	special_button.modulate = Color.WHITE
+		special_button.text = "必殺\n%d%%" % percent
+	special_button.disabled = not ready
+	_apply_special_style(active, ready)
+	special_button.pivot_offset = special_button.size * 0.5
+	if ready:
+		var pulse := 1.0 + 0.05 * sin(_anim * 7.5)
+		special_button.scale = Vector2(pulse, pulse)
+		special_button.modulate = Color.WHITE
+	elif active:
+		special_button.scale = Vector2.ONE
+		var flick := 0.5 + 0.5 * sin(_anim * 16.0)
+		special_button.modulate = Color(1.0, 0.86 + flick * 0.14, 0.7)
+	else:
+		special_button.scale = Vector2.ONE
+		special_button.modulate = Color.WHITE
 
 
 func _build_boss_hud() -> void:
@@ -1275,13 +1294,13 @@ func _build_boss_hud() -> void:
 	var root := Control.new()
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
-	UiFont.full_rect(root)
+	_fill(root)
 
 	_boss_margin = MarginContainer.new()
-	_boss_margin.anchors_preset = Control.PRESET_FULL_RECT
+	root.add_child(_boss_margin)
+	_fill(_boss_margin)
 	_boss_margin.add_theme_constant_override("margin_left", 24)
 	_boss_margin.add_theme_constant_override("margin_right", 24)
-	root.add_child(_boss_margin)
 
 	var main_col := VBoxContainer.new()
 	main_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1374,11 +1393,14 @@ func _sync_boss_hud() -> void:
 
 
 func _show_boss_banner(kind: String) -> void:
-	var nimoton := kind == Balance.KIND_NIMOTON
-	_boss_banner_image.texture = UiFont.cropped(ART_NIMOTON) if nimoton else _kassen_portrait()
-	_boss_banner_name.text = "%s、乱入" % str(Balance.BOSS_NAME[kind])
-	_boss_banner_action.text = "毒液 / 群れを強化" if nimoton else "バレーアタック / 強烈な蹴り"
-	var edge := Color("a9eb4b") if nimoton else Color("f3ba47")
+	_boss_banner_image.texture = _intrusion_portrait(kind)
+	_boss_banner_name.text = "%s、乱入" % str(Balance.ENEMY_NAME[kind])
+	_boss_banner_action.text = _intrusion_line(kind)
+	var edge := Color("f3ba47")
+	if kind == Balance.KIND_NIMOTON:
+		edge = Color("a9eb4b")
+	elif kind == Balance.KIND_TEACHER:
+		edge = Color("e7d7a2")
 	_boss_banner.add_theme_stylebox_override("panel", UiFont.style(Color("15120f"), edge, 5, 6))
 	_boss_banner.visible = true
 	_boss_banner.modulate.a = 0.0
@@ -1391,6 +1413,30 @@ func _show_boss_banner(kind: String) -> void:
 	_boss_banner_tween.tween_interval(1.8)
 	_boss_banner_tween.tween_property(_boss_banner, "modulate:a", 0.0, 0.25)
 	_boss_banner_tween.tween_callback(func() -> void: _boss_banner.visible = false)
+
+
+func _intrusion_portrait(kind: String) -> Texture2D:
+	if kind == Balance.KIND_NIMOTON:
+		return UiFont.cropped(ART_NIMOTON)
+	if kind == Balance.KIND_TEACHER:
+		return UiFont.cropped(ART_TEACHER)
+	return _kassen_portrait()
+
+
+func _intrusion_line(kind: String) -> String:
+	if kind == Balance.KIND_NIMOTON:
+		return "毒液 / 群れを強化"
+	if kind == Balance.KIND_KASSEN:
+		return "バレーアタック / 強烈な蹴り"
+	return str(Balance.ENEMY_SPECIAL.get(kind, ""))
+
+
+func _attack_hint() -> String:
+	if _who == Balance.CHAR_TAKETCHI:
+		return "拳  近距離・高威力"
+	if _who == Balance.CHAR_KENNY:
+		return "キック  高速移動"
+	return "鉄パイプ  広範囲攻撃"
 
 
 func _kassen_portrait() -> Texture2D:
@@ -1412,84 +1458,70 @@ func _build_choice() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 20
 	add_child(layer)
+
 	build_root = Control.new()
 	build_root.visible = false
-	build_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	build_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	build_root.offset_left = 0
+	build_root.offset_top = 0
+	build_root.offset_right = 0
+	build_root.offset_bottom = 0
 	layer.add_child(build_root)
-	UiFont.full_rect(build_root)
 
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.62)
+	dim.color = Color(0, 0, 0, 0.65)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.offset_left = 0
+	dim.offset_top = 0
+	dim.offset_right = 0
+	dim.offset_bottom = 0
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	UiFont.full_rect(dim)
 	build_root.add_child(dim)
 
-	var choice_margin = MarginContainer.new()
-	choice_margin.anchors_preset = Control.PRESET_FULL_RECT
-	choice_margin.add_theme_constant_override("margin_left", 24)
-	choice_margin.add_theme_constant_override("margin_right", 24)
-	build_root.add_child(choice_margin)
+	card_row = VBoxContainer.new()
+	card_row.position = Vector2(40, 160)
+	card_row.size = Vector2(get_viewport_rect().size.x - 80, 420)
+	card_row.add_theme_constant_override("separation", 12)
+	build_root.add_child(card_row)
 
-	var col := VBoxContainer.new()
-	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_theme_constant_override("separation", 16)
-	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	choice_margin.add_child(col)
-
-	var heading := UiFont.label("強化選択", 32 if _compact_layout else 40, UiFont.PAPER)
-	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(heading)
-	var note := UiFont.label("時間内に選択 / 期限後は左端", 18 if _compact_layout else 22, UiFont.BRASS)
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(note)
-
-	if _stacked_cards:
-		card_row = VBoxContainer.new()
-		card_row.add_theme_constant_override("separation", 8)
-	else:
-		card_row = HBoxContainer.new()
-		card_row.add_theme_constant_override("separation", 8 if _compact_layout else 22)
-	card_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	card_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	card_row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	col.add_child(card_row)
-
-	timer_label = UiFont.label("20.0", 24, UiFont.PAPER)
+	timer_label = UiFont.label("20.0", 28, UiFont.PAPER)
+	timer_label.position = Vector2(0, get_viewport_rect().size.y - 86)
+	timer_label.size = Vector2(get_viewport_rect().size.x, 40)
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	timer_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(timer_label)
-	var track := Control.new()
-	track.custom_minimum_size = Vector2(0, 16)
-	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(track)
-	var back := ColorRect.new()
-	back.color = Color(1, 1, 1, 0.2)
-	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(back)
-	track.add_child(back)
+	build_root.add_child(timer_label)
+	var timer_track := ColorRect.new()
+	timer_track.color = Color(1, 1, 1, 0.22)
+	timer_track.position = Vector2(60, get_viewport_rect().size.y - 42)
+	timer_track.size = Vector2(get_viewport_rect().size.x - 120, 14)
+	timer_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	build_root.add_child(timer_track)
 	timer_fill = ColorRect.new()
 	timer_fill.color = UiFont.PINK
+	timer_fill.position = timer_track.position
+	timer_fill.size = timer_track.size
 	timer_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	timer_fill.anchor_left = 0
-	timer_fill.anchor_top = 0
-	timer_fill.anchor_bottom = 1
-	timer_fill.anchor_right = 1
-	track.add_child(timer_fill)
+	build_root.add_child(timer_fill)
 
 
 func _show_build() -> void:
+	if build_root == null:
+		return
 	build_root.visible = true
-	build_root.mouse_filter = Control.MOUSE_FILTER_STOP
-	hint.visible = false
-	stick.visible = false
+	if hint:
+		hint.visible = false
+	if stick:
+		stick.visible = false
+
 	for child in card_row.get_children():
 		child.queue_free()
-	for index in sim.current_choices.size():
-		card_row.add_child(_card(index, sim.current_choices[index]))
+
+	if sim and sim.current_choices:
+		for index in sim.current_choices.size():
+			var card = _card(index, sim.current_choices[index])
+			if card:
+				card_row.add_child(card)
+
 	_update_timer()
 
 
@@ -1507,9 +1539,8 @@ func _card(index: int, id: String) -> Control:
 	var accents: Array[Color] = [Color("2a241c"), Color("8c6840"), Color("6a4030")]
 	var accent: Color = accents[index % accents.size()]
 	var button := Button.new()
-	var card_width := 312.0
-	var card_height := _stacked_card_h
-	button.custom_minimum_size = Vector2(card_width, card_height)
+	var card_width := 440.0
+	button.custom_minimum_size = Vector2(card_width, CARD_H)
 	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_stylebox_override("normal", UiFont.style(UiFont.PAPER, accent, 5, 18))
 	button.add_theme_stylebox_override("hover", UiFont.style(UiFont.YELLOW, accent, 5, 18))
@@ -1521,70 +1552,67 @@ func _card(index: int, id: String) -> Control:
 	band.color = accent
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	band.anchor_right = 1.0
-	band.offset_left = 8.0
-	band.offset_top = 8.0
-	band.offset_right = -8.0
-	band.offset_bottom = 36.0 if _stacked_cards else 52.0
+	band.offset_left = 12.0
+	band.offset_top = 10.0
+	band.offset_right = -12.0
+	band.offset_bottom = 40.0
 	button.add_child(band)
-	var key := UiFont.label("%d" % (index + 1), 26, UiFont.PAPER)
+
+	var key := UiFont.label("%d" % (index + 1), 28, UiFont.PAPER)
 	key.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	key.position = Vector2(22, 12 if _stacked_cards else 14)
+	key.position = Vector2(26, 14)
 	button.add_child(key)
 
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	box.offset_left = 24
-	box.offset_top = 44 if _stacked_cards else 64
-	box.offset_right = -24
-	box.offset_bottom = -10 if _stacked_cards else -16
+	box.offset_left = 28
+	box.offset_top = 48
+	box.offset_right = -28
+	box.offset_bottom = -12
 	box.add_theme_constant_override("separation", 10)
 	button.add_child(box)
 
-	var name := UiFont.label(Balance.UPGRADE_NAME[id], 20 if _stacked_cards else (23 if _compact_layout else 28), UiFont.INK)
+	var name := UiFont.label(Balance.UPGRADE_NAME[id], 22, UiFont.INK)
 	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name.add_theme_constant_override("outline_size", 0)
-	var level := UiFont.label("レベル %d  →  %d" % [current, nxt], 16 if _stacked_cards else (19 if _compact_layout else 24), UiFont.PINK)
+	var level := UiFont.label("レベル %d  →  %d" % [current, nxt], 18, UiFont.PINK)
 	level.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	level.add_theme_constant_override("outline_size", 0)
-	var body := UiFont.label(Balance.upgrade_blurb(id, nxt), 16 if _stacked_cards else (17 if _compact_layout else 22), UiFont.INK)
+	var body := UiFont.label(Balance.upgrade_blurb(id, nxt), 18, UiFont.INK)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_theme_constant_override("outline_size", 0)
-	var mark := UiFont.label("自動選択", 14 if _stacked_cards else 18, UiFont.NAVY)
-	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mark.add_theme_constant_override("outline_size", 0)
-	if _stacked_cards:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 12)
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		box.add_child(row)
-		var side := VBoxContainer.new()
-		side.add_theme_constant_override("separation", 2)
-		side.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		side.custom_minimum_size = Vector2(card_width * 0.40, 0)
-		row.add_child(side)
-		side.add_child(name)
-		side.add_child(level)
-		if index == 0:
-			side.add_child(mark)
-		body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		row.add_child(body)
-		return button
-	box.add_child(name)
-	box.add_child(level)
-	box.add_child(body)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(row)
+	var side := VBoxContainer.new()
+	side.add_theme_constant_override("separation", 2)
+	side.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	side.custom_minimum_size = Vector2(card_width * 0.42, 0)
+	row.add_child(side)
+	side.add_child(name)
+	side.add_child(level)
 	if index == 0:
-		box.add_child(mark)
+		var mark := UiFont.label("自動選択", 16, UiFont.NAVY)
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mark.add_theme_constant_override("outline_size", 0)
+		side.add_child(mark)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(body)
 	return button
 
 
 func _update_timer() -> void:
 	var left := maxf(0.0, build_left)
 	timer_label.text = "%.1f" % left
-	timer_fill.anchor_right = clampf(left / Balance.BUILD_SELECT_SECONDS, 0.0, 1.0)
+	var width := get_viewport_rect().size.x - 120.0
+	var ratio := clampf(left / Balance.BUILD_SELECT_SECONDS, 0.0, 1.0)
+	timer_fill.size = Vector2(width * ratio, timer_fill.size.y)
 
 
 func _owned_builds() -> String:

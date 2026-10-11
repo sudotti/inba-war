@@ -190,10 +190,20 @@ func _show_entry(kind: String) -> void:
 
 	_portrait.texture = _portrait_texture(kind)
 	_name.text = str(Balance.ENEMY_NAME[kind])
-	_role.text = "乱入ボス" if Balance.BOSS_KINDS.has(kind) else "校庭の敵"
+	if Balance.BOSS_KINDS.has(kind):
+		_role.text = "乱入ボス"
+	elif Balance.RAID_KINDS.has(kind):
+		_role.text = "乱入"
+	else:
+		_role.text = "校庭の敵"
 	var stats: Dictionary = Balance.ENEMIES[kind]
 	_stats.text = "HP %d   速 %d   接触 %d" % [int(stats.hp), int(stats.speed), int(stats.touch)]
-	_special.text = "必殺技  %s" % str(Balance.BOSS_SPECIAL.get(kind, "")) if Balance.BOSS_KINDS.has(kind) else ""
+	var special := ""
+	if Balance.BOSS_KINDS.has(kind):
+		special = str(Balance.BOSS_SPECIAL.get(kind, ""))
+	elif Balance.ENEMY_SPECIAL.has(kind):
+		special = str(Balance.ENEMY_SPECIAL[kind])
+	_special.text = "" if special == "" else "必殺技  %s" % special
 	_description.text = str(Balance.ENEMY_DESCRIPTION[kind])
 	_record.text = "撃破  %d" % kills
 
@@ -208,6 +218,8 @@ func _portrait_path(kind: String) -> String:
 			return "res://assets/battle/enemy_tank.png"
 		Balance.KIND_NIMOTON:
 			return "res://assets/battle/boss_nimoton.png"
+		Balance.KIND_TEACHER:
+			return "res://assets/battle/teacher.png"
 		_:
 			return "res://assets/battle/boss_kassen.png"
 
@@ -218,7 +230,7 @@ func _portrait_texture(kind: String) -> Texture2D:
 		atlas.atlas = load(_portrait_path(kind))
 		atlas.region = Rect2(286.0, 190.0, 452.0, 640.0)
 		return atlas
-	if kind == Balance.KIND_NIMOTON:
+	if kind == Balance.KIND_NIMOTON or kind == Balance.KIND_TEACHER:
 		return UiFont.cropped(_portrait_path(kind))
 	return load(_portrait_path(kind))
 

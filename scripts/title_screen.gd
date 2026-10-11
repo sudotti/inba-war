@@ -279,25 +279,6 @@ func _make_sub_button(label: String, icon: String, callback: Callable) -> Button
 	return btn
 
 
-func _name_button() -> Button:
-	var node := Button.new()
-	node.text = "プレイヤー  %s" % SaveStore.shown_name()
-	node.add_theme_font_override("font", UiFont.font())
-	node.add_theme_font_size_override("font_size", 20)
-	node.add_theme_color_override("font_color", UiFont.CREAM)
-	node.add_theme_color_override("font_hover_color", UiFont.GOLD)
-	node.add_theme_color_override("font_pressed_color", UiFont.GOLD)
-	node.add_theme_color_override("font_focus_color", UiFont.CREAM)
-	node.add_theme_color_override("font_disabled_color", UiFont.CREAM)
-	var empty := StyleBoxEmpty.new()
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		node.add_theme_stylebox_override(state, empty)
-	node.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	node.mouse_filter = Control.MOUSE_FILTER_STOP
-	node.pressed.connect(_open_name_entry)
-	return node
-
-
 func _open_name_entry() -> void:
 	if _name_panel != null:
 		_name_panel.visible = true
@@ -407,4 +388,4 @@ func _open_bestiary() -> void:
 
 
 func _open_settings() -> void:
-	pass
+	_open_name_entry()

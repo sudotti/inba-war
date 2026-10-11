@@ -28,11 +28,6 @@ const SPECIAL_TAKETCHI_MOTION_SECONDS := 0.95
 const SPECIAL_KENNY_ATTACK_INTERVAL := 0.12
 const SPECIAL_KENNY_MOTION_SECONDS := 0.85
 
-const SPECIAL_QUOTES := {
-	CHAR_MASSA: "印旛の未来は僕が守るっ！",
-	CHAR_TAKETCHI: "こいつら蹴散らしたら、銭湯行かね？",
-	CHAR_KENNY: "私の勝利に、100ｲｪﾝ賭けます。",
-}
 
 const MAX_ALIVE := 60
 const DESPAWN_DISTANCE := 860.0
@@ -117,7 +112,6 @@ const RAID_SPAWN_FIRST := 60.0
 const RAID_SPAWN_INTERVAL := 40.0
 const TANK_SPAWN_FIRST := 75.0
 const TANK_SPAWN_INTERVAL := 50.0
-const TANK_SPAWN_CHANCE := 0.05
 
 const BUTTO := "buttobashi"
 const ONIGIRI := "onigiri"
@@ -136,6 +130,11 @@ const UPGRADES: Array[String] = [
 const CHAR_MASSA := "マッサ"
 const CHAR_TAKETCHI := "タケッチ"
 const CHAR_KENNY := "ケニー"
+const SPECIAL_QUOTES := {
+	CHAR_MASSA: "印旛の未来は僕が守るっ！",
+	CHAR_TAKETCHI: "こいつら蹴散らしたら、銭湯行かね？",
+	CHAR_KENNY: "私の勝利に、100ｲｪﾝ賭けます。",
+}
 
 const CHARACTERS := {
 	CHAR_MASSA: {
@@ -206,6 +205,13 @@ const ENEMIES := {
 		"radius": 54.0,
 		"knockback_scale": 0.12,
 	},
+	KIND_TEACHER: {
+		"hp": 86,
+		"speed": 165.0,
+		"touch": 12,
+		"radius": 26.0,
+		"knockback_scale": 0.6,
+	},
 }
 
 const SCORE := {
@@ -214,6 +220,7 @@ const SCORE := {
 	KIND_TANK: 200,
 	KIND_NIMOTON: 1800,
 	KIND_KASSEN: 1600,
+	KIND_TEACHER: 120,
 }
 
 const COIN_CHANCE := {
@@ -222,6 +229,7 @@ const COIN_CHANCE := {
 	KIND_TANK: 1.0,
 	KIND_NIMOTON: 1.0,
 	KIND_KASSEN: 1.0,
+	KIND_TEACHER: 0.85,
 }
 
 const COIN_COUNT := {
@@ -230,6 +238,7 @@ const COIN_COUNT := {
 	KIND_TANK: 3,
 	KIND_NIMOTON: 10,
 	KIND_KASSEN: 8,
+	KIND_TEACHER: 2,
 }
 
 const KIND_LABEL := {
@@ -238,6 +247,7 @@ const KIND_LABEL := {
 	KIND_TANK: "耐久",
 	KIND_NIMOTON: "ニーモトン",
 	KIND_KASSEN: "カッセン",
+	KIND_TEACHER: "先生",
 }
 
 const UPGRADE_NAME := {
@@ -331,13 +341,14 @@ static func special_motion_seconds(who: String) -> float:
 	return SPECIAL_MASSA_MOTION_SECONDS
 
 
-static func score_from_kills(normal: int, fast: int, tank: int, nimoton: int = 0, kassen: int = 0) -> int:
+static func score_from_kills(normal: int, fast: int, tank: int, nimoton: int = 0, kassen: int = 0, teacher: int = 0) -> int:
 	return (
 		normal * SCORE[KIND_NORMAL]
 		+ fast * SCORE[KIND_FAST]
 		+ tank * SCORE[KIND_TANK]
 		+ nimoton * SCORE[KIND_NIMOTON]
 		+ kassen * SCORE[KIND_KASSEN]
+		+ teacher * SCORE[KIND_TEACHER]
 	)
 
 
@@ -351,12 +362,12 @@ static func kills_within_cap(normal: int, fast: int, tank: int) -> bool:
 
 static func spawn_profile(elapsed: float) -> Dictionary:
 	if elapsed < 45.0:
-		return {"interval": 0.90, "fast": 0.0}
+		return {"interval": 0.60, "fast": 0.0}
 	if elapsed < 75.0:
-		return {"interval": 0.70, "fast": 0.20}
+		return {"interval": 0.47, "fast": 0.20}
 	if elapsed < 120.0:
-		return {"interval": 0.55, "fast": 0.30}
-	return {"interval": 0.42, "fast": 0.40}
+		return {"interval": 0.37, "fast": 0.30}
+	return {"interval": 0.28, "fast": 0.40}
 
 
 static func kind_for_roll(elapsed: float, roll: float) -> String:

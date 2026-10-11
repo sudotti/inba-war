@@ -91,6 +91,7 @@ var kills_of: Dictionary = {
 	Balance.KIND_TANK: 0,
 	Balance.KIND_NIMOTON: 0,
 	Balance.KIND_KASSEN: 0,
+	Balance.KIND_TEACHER: 0,
 }
 var score: int = 0
 var coin_value: float = 0.0
@@ -120,7 +121,8 @@ var _spawn_acc: float = 0.0
 var _next_hurt: float = Balance.INVULN_SECONDS
 var _next_build_index: int = 0
 var _pending_offers: int = 0
-var _kaiju_next: float = 75.0
+var _kaiju_next: float = Balance.TANK_SPAWN_FIRST
+var _raid_next: float = Balance.RAID_SPAWN_FIRST
 
 
 func _init(who: String = Balance.CHAR_MASSA) -> void:
@@ -265,6 +267,7 @@ func _step_slice(dt: float, move_dir: Vector2) -> void:
 		_update_spawns(dt)
 	if spawns_enabled:
 		_update_kaiju()
+		_update_teacher_raid()
 		_update_boss_raid()
 	if _open_build_if_needed():
 		return
@@ -312,6 +315,7 @@ func make_summary() -> Dictionary:
 		"kills_tank": int(kills_of[Balance.KIND_TANK]),
 		"kills_nimoton": int(kills_of[Balance.KIND_NIMOTON]),
 		"kills_kassen": int(kills_of[Balance.KIND_KASSEN]),
+		"kills_teacher": int(kills_of[Balance.KIND_TEACHER]),
 		"enemy_seen": enemy_seen_this_run.keys(),
 		"coins": shown_coins(),
 		"outcome": outcome,
@@ -357,6 +361,9 @@ func _move_enemies(dt: float) -> void:
 		if Balance.BOSS_KINDS.has(actor.kind):
 			actor.phase += dt
 			_move_boss(actor, dt)
+			continue
+		if actor.kind == Balance.KIND_TEACHER:
+			_move_teacher(actor, dt)
 			continue
 		var toward := player_pos - actor.pos
 		if toward.length() < 0.001:
@@ -417,6 +424,49 @@ func _move_boss(actor: Actor, dt: float) -> void:
 			actor.state_left = 0.82
 		return
 	_move_boss_range(actor, 290.0, dt)
+
+
+func _move_teacher(actor: Actor, dt: float) -> void:
+	if actor.attack_state == "slide_dash":
+		var dash := actor.target_pos - actor.pos
+		if dash.length() > 0.001:
+			actor.pos = _clamp_field(actor.pos + dash.normalized() * 640.0 * dt, actor.radius)
+		var reach := actor.radius + player_radius + 28.0
+		if not actor.dash_hit and actor.pos.distance_to(player_pos) <= reach:
+			actor.dash_hit = true
+			var before := player_hp
+			_boss_hit_player(16)
+			if player_hp < before:
+				var away := player_pos - actor.pos
+				if away.length() > 0.001:
+					player_pos = _clamp_field(player_pos + away.normalized() * 48.0, player_radius)
+		actor.state_left -= dt
+		if actor.state_left <= 0.0:
+			actor.attack_state = ""
+			actor.attack_timer = 2.4
+		return
+	if actor.attack_state == "slide_windup":
+		actor.target_pos = player_pos
+		actor.state_left -= dt
+		if actor.state_left <= 0.0:
+			var aim := player_pos - actor.pos
+			if aim.length() < 0.001:
+				aim = Vector2.RIGHT
+			actor.target_pos = _clamp_field(actor.pos + aim.normalized() * 280.0, actor.radius)
+			actor.attack_state = "slide_dash"
+			actor.state_left = 0.42
+			actor.dash_hit = false
+		return
+	actor.attack_timer -= dt
+	if actor.attack_timer <= 0.0:
+		actor.attack_state = "slide_windup"
+		actor.state_left = 0.48
+		actor.target_pos = player_pos
+		return
+	var toward := player_pos - actor.pos
+	if toward.length() < 0.001:
+		return
+	actor.pos = _clamp_field(actor.pos + toward.normalized() * actor.speed * dt, actor.radius)
 
 
 func _move_boss_range(actor: Actor, desired_range: float, dt: float) -> void:
@@ -728,12 +778,23 @@ func _spawn_scheduled(elapsed: float) -> void:
 func _update_kaiju() -> void:
 	while _kaiju_next <= time and _kaiju_next <= Balance.ROUND_SECONDS:
 		var when := _kaiju_next
-		_kaiju_next += 30.0
+		_kaiju_next += Balance.TANK_SPAWN_INTERVAL
 		if enemies.size() >= Balance.MAX_ALIVE:
 			continue
 		if _kaiju_alive():
 			continue
 		_spawn_kind(Balance.KIND_TANK, when)
+
+
+func _update_teacher_raid() -> void:
+	while _raid_next <= time and _raid_next <= Balance.ROUND_SECONDS:
+		var when := _raid_next
+		_raid_next += Balance.RAID_SPAWN_INTERVAL
+		if enemies.size() >= Balance.MAX_ALIVE:
+			continue
+		if _kind_alive(Balance.KIND_TEACHER):
+			continue
+		_spawn_kind(Balance.KIND_TEACHER, when)
 
 
 func _update_boss_raid() -> void:
@@ -763,7 +824,7 @@ func _spawn_kind(kind: String, elapsed: float) -> bool:
 	actor.pos = found[0]
 	enemies.append(actor)
 	enemy_seen_this_run[kind] = true
-	if Balance.BOSS_KINDS.has(kind):
+	if Balance.BOSS_KINDS.has(kind) or Balance.RAID_KINDS.has(kind):
 		boss_alert_kind = kind
 		boss_alert_serial += 1
 	max_alive_seen = maxi(max_alive_seen, enemies.size())
@@ -789,6 +850,9 @@ func _make_actor(kind: String, elapsed: float) -> Actor:
 		actor.max_hp = ceili(float(stats.hp) * (1.0 + clampf(elapsed / Balance.ROUND_SECONDS, 0.0, 1.0) * 0.35))
 		actor.attack_timer = 2.0 if kind == Balance.KIND_NIMOTON else 2.8
 		actor.support_timer = 4.6
+	elif kind == Balance.KIND_TEACHER:
+		actor.max_hp = Balance.scaled_hp(int(stats.hp), elapsed)
+		actor.attack_timer = 1.6
 	else:
 		actor.max_hp = Balance.scaled_hp(int(stats.hp), elapsed)
 	actor.hp = actor.max_hp
@@ -838,11 +902,8 @@ func _kill(actor: Actor) -> void:
 
 func _register_kill(kind: String) -> void:
 	kills += 1
-	special_charge = minf(
-		Balance.SPECIAL_GAUGE_MAX,
-		special_charge + Balance.SPECIAL_CHARGE_PER_KILL
-	)
-	kills_of[kind] = int(kills_of[kind]) + 1
+	special_charge = minf(Balance.SPECIAL_GAUGE_MAX, special_charge + Balance.SPECIAL_CHARGE_PER_KILL)
+	kills_of[kind] = int(kills_of.get(kind, 0)) + 1
 	score += int(Balance.SCORE[kind])
 	var megumi_level := int(levels[Balance.MEGUMI])
 	if megumi_level > 0 and kills % 10 == 0:
@@ -916,8 +977,12 @@ func _roll_choices() -> Array:
 
 
 func _kaiju_alive() -> bool:
+	return _kind_alive(Balance.KIND_TANK)
+
+
+func _kind_alive(kind: String) -> bool:
 	for actor in enemies:
-		if actor.kind == Balance.KIND_TANK:
+		if actor.kind == kind:
 			return true
 	return false
 
