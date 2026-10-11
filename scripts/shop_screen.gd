@@ -159,7 +159,9 @@ func _refresh() -> void:
 	if owns and locked.is_empty():
 		_speech.text = "全員加入済み。\n出撃準備完了だ。"
 	elif locked.is_empty():
-		_speech.text = "仲間は全員加入済み。\n制服はもう持っているな。"
+		_speech.text = "仲間は全員加入済み。\n制服を置いてある。"
+	elif owns:
+		_speech.text = "制服は持っている。\n解放かけらを置いてある。"
 	else:
 		_speech.text = "制服と解放かけらを置いてある。\n遠慮なく買っていけ。"
 

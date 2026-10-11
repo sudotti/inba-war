@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_boss_raid()
 	_save()
 	_shop()
+	_unclaimed()
 	_kite()
 	if fails == 0:
 		print("ALL OK")
@@ -708,9 +709,55 @@ func _shop() -> void:
 	_eq(loaded.playable_character(), Balance.CHAR_KENNY, "selected persists")
 	_true(bool(loaded.data.has_uniform), "uniform persists")
 	_true(loaded.is_playable(Balance.CHAR_TAKETCHI), "takechi persists")
+	_eq(int(loaded.data.yen), before + 600 + 4 + 600, "reload cashes an unclaimed clear")
+	_eq(loaded.data.unclaimed_run, null, "cashed run is no longer pending")
 	_wipe(path)
 	store.free()
 	loaded.free()
+
+
+func _unclaimed() -> void:
+	var path := "/tmp/inba_war_unclaimed.json"
+	_wipe(path)
+	var store = SaveStore.new()
+	store.load_from(path)
+	var summary := {
+		"score": 20,
+		"kills": 10,
+		"kills_normal": 10,
+		"kills_fast": 0,
+		"kills_tank": 0,
+		"kills_nimoton": 0,
+		"kills_kassen": 0,
+		"kills_teacher": 0,
+		"coins": 0,
+		"outcome": "clear",
+		"character": Balance.CHAR_MASSA,
+		"time": 180.0,
+	}
+	store.commit_run(summary)
+	_eq(store.fragments_of(Balance.CHAR_TAKETCHI), 0, "commit still holds fragments")
+	_true(typeof(store.data.unclaimed_run) == TYPE_DICTIONARY, "unclaimed saved")
+	var reloaded = SaveStore.new()
+	reloaded.load_from(path)
+	_eq(reloaded.fragments_of(Balance.CHAR_TAKETCHI), 0, "reload waits for a choice")
+	_eq(reloaded.fragments_of(Balance.CHAR_KENNY), 0, "reload waits for kenny too")
+	_true(typeof(reloaded.data.unclaimed_run) == TYPE_DICTIONARY, "choice still pending")
+	var waiting: Dictionary = reloaded.claim_unclaimed("")
+	_eq(str(waiting.state), "choice", "blank claim keeps the choice")
+	var claim: Dictionary = reloaded.claim_unclaimed(Balance.CHAR_TAKETCHI)
+	_eq(str(claim.state), "done", "choice claims")
+	_eq(reloaded.fragments_of(Balance.CHAR_TAKETCHI), 2, "two fragments saved")
+	_eq(reloaded.data.unclaimed_run, null, "claim clears unclaimed")
+	var again = SaveStore.new()
+	again.load_from(path)
+	_eq(again.fragments_of(Balance.CHAR_TAKETCHI), 2, "claimed fragments persist")
+	_eq(again.fragments_of(Balance.CHAR_KENNY), 0, "the other friend stays at zero")
+	_eq(again.data.unclaimed_run, null, "second launch does not grant again")
+	_wipe(path)
+	store.free()
+	reloaded.free()
+	again.free()
 
 
 func _kite() -> void:

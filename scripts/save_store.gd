@@ -27,6 +27,8 @@ func load_from(file_path: String) -> void:
 		_write()
 		return
 	data = _coerce(parsed)
+	if typeof(data.get("unclaimed_run")) == TYPE_DICTIONARY:
+		claim_unclaimed("", true)
 	_write()
 
 
@@ -42,8 +44,16 @@ func set_display_name(raw: String) -> bool:
 	if not Balance.is_valid_display_name(raw):
 		return false
 	data.display_name = raw
+	data.name_skipped = false
 	_write()
 	return true
+
+
+func skip_display_name() -> void:
+	if bool(data.get("name_skipped", false)):
+		return
+	data.name_skipped = true
+	_write()
 
 
 func commit_run(summary: Dictionary) -> Dictionary:
@@ -100,13 +110,15 @@ func commit_run(summary: Dictionary) -> Dictionary:
 			"version": Balance.VERSION,
 			"datetime": when,
 		}
-	_write()
 	var out := summary.duplicate(true)
 	out.best_updated = updated
 	out.best_score = int(data.best_score)
 	out.best_datetime = str(data.best_datetime)
 	out.yen = int(data.yen)
+	# かけらは結果画面で渡す。再読み込みでも消えないよう、渡すまでセーブに残す。
+	data.unclaimed_run = out.duplicate(true)
 	last_result = out
+	_write()
 	return out
 
 
@@ -223,7 +235,7 @@ func buy_fragment(who: String) -> String:
 	return "unlocked" if unlocked else "ok"
 
 
-func grant_fragments(who: String, count: int) -> Dictionary:
+func grant_fragments(who: String, count: int, persist: bool = true) -> Dictionary:
 	var applied := 0
 	var yen := 0
 	var unlocked := false
@@ -236,9 +248,56 @@ func grant_fragments(who: String, count: int) -> Dictionary:
 			yen += Balance.FRAGMENT_EXCHANGE
 	if yen > 0:
 		data.yen = int(data.yen) + yen
-	if count > 0:
+	if persist and count > 0:
 		_write()
 	return {"applied": applied, "yen": yen, "unlocked": unlocked}
+
+
+# 戦闘の未受け取りかけらを渡す。二人とも未加入で行き先が無いときはセーブを残す。
+func claim_unclaimed(who: String = "", announce: bool = false) -> Dictionary:
+	var run = data.get("unclaimed_run", null)
+	var empty := {"state": "empty", "note": "", "reward": 0, "applied": 0, "yen": 0, "unlocked": false}
+	if typeof(run) != TYPE_DICTIONARY:
+		return empty
+	var reward := reward_fragments(str(run.get("outcome", "")), int(run.get("kills", 0)))
+	var locked := locked_friends()
+	if reward > 0 and locked.size() >= 2 and not locked.has(who):
+		return {"state": "choice", "note": "", "reward": reward, "applied": 0, "yen": 0, "unlocked": false}
+	var applied := 0
+	var yen := 0
+	var unlocked := false
+	var note := "獲得かけらなし"
+	if reward <= 0:
+		pass
+	elif locked.is_empty():
+		yen = reward * Balance.FRAGMENT_EXCHANGE
+		data.yen = int(data.yen) + yen
+		note = "余剰かけらを %d イェンに交換" % yen
+	else:
+		var target := who
+		if locked.size() == 1:
+			target = str(locked[0])
+		var info := grant_fragments(target, reward, false)
+		applied = int(info.applied)
+		yen = int(info.yen)
+		unlocked = bool(info.unlocked)
+		note = "%s  かけら +%d（%d / 5）" % [target, applied, fragments_of(target)]
+		if unlocked:
+			note += "  加入"
+		if yen > 0:
+			note += "  換金 +%d イェン" % yen
+	data.unclaimed_run = null
+	if announce and reward > 0:
+		data.fragment_notice = note
+	_write()
+	return {"state": "done", "note": note, "reward": reward, "applied": applied, "yen": yen, "unlocked": unlocked}
+
+
+func clear_fragment_notice() -> void:
+	if str(data.get("fragment_notice", "")) == "":
+		return
+	data.fragment_notice = ""
+	_write()
 
 
 func _accepts_fragment(who: String) -> bool:
@@ -272,6 +331,7 @@ func _fresh() -> Dictionary:
 		"schema": 2,
 		"player_id": _uuid(),
 		"display_name": "",
+		"name_skipped": false,
 		"yen": 0,
 		"takechi_fragments": 0,
 		"kenny_fragments": 0,
@@ -298,6 +358,8 @@ func _fresh() -> Dictionary:
 		},
 		"local_scores": [],
 		"selected": Balance.CHAR_MASSA,
+		"unclaimed_run": null,
+		"fragment_notice": "",
 	}
 
 
@@ -309,6 +371,7 @@ func _coerce(parsed: Dictionary) -> Dictionary:
 	base.display_name = str(parsed.get("display_name", ""))
 	if base.display_name != "" and not Balance.is_valid_display_name(base.display_name):
 		base.display_name = ""
+	base.name_skipped = bool(parsed.get("name_skipped", false))
 	base.yen = maxi(0, int(parsed.get("yen", 0)))
 	base.takechi_fragments = mini(Balance.FRAGMENTS_TO_UNLOCK, maxi(0, int(parsed.get("takechi_fragments", 0))))
 	base.kenny_fragments = mini(Balance.FRAGMENTS_TO_UNLOCK, maxi(0, int(parsed.get("kenny_fragments", 0))))
@@ -362,6 +425,9 @@ func _coerce(parsed: Dictionary) -> Dictionary:
 		)
 		if base.local_scores.size() > 10:
 			base.local_scores.resize(10)
+	var pending_run = parsed.get("unclaimed_run", null)
+	base.unclaimed_run = pending_run.duplicate(true) if typeof(pending_run) == TYPE_DICTIONARY else null
+	base.fragment_notice = str(parsed.get("fragment_notice", "")).substr(0, 120)
 	return base
 
 

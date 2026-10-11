@@ -12,8 +12,11 @@ var _main_margin: MarginContainer
 
 
 func _ready() -> void:
+	if typeof(SaveStore.data.get("unclaimed_run")) == TYPE_DICTIONARY:
+		get_tree().change_scene_to_file("res://scenes/result.tscn")
+		return
 	_build()
-	if SaveStore.shown_name() == "":
+	if str(SaveStore.data.get("display_name", "")) == "" and not bool(SaveStore.data.get("name_skipped", false)):
 		_open_name_entry()
 
 
@@ -98,9 +101,17 @@ func _build_content() -> void:
 	top_bar.add_child(spacer)
 
 	# Right: yen
-	var yen_pill := _make_pill("💰 " + str(int(SaveStore.data.get("yen", 0))) + "円")
-	yen_pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var yen_pill := _make_pill("%d円" % int(SaveStore.data.get("yen", 0)))
+	yen_pill.size_flags_horizontal = Control.SIZE_SHRINK_END
 	top_bar.add_child(yen_pill)
+
+	var notice := str(SaveStore.data.get("fragment_notice", ""))
+	if notice != "":
+		var note := UiFont.label(notice, 16, UiFont.GOLD)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		root.add_child(note)
 
 	# Spacer to push content to center
 	var v_spacer_top := Control.new()
@@ -121,14 +132,14 @@ func _build_content() -> void:
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(grid)
 
-	var items = [
-		["ランキング", "🏆", _open_ranking],
-		["敵図鑑", "📖", _open_bestiary],
-		["なかむら商店", "🏪", _open_shop],
-		["設定", "⚙", _open_settings],
+	var items: Array = [
+		["ランキング", _open_ranking],
+		["敵図鑑", _open_bestiary],
+		["なかむら商店", _open_shop],
+		["設定", _open_settings],
 	]
 	for item in items:
-		var btn := _make_sub_button(item[0], item[1], item[2])
+		var btn := _make_sub_button(str(item[0]), "", item[1])
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.custom_minimum_size = Vector2(0, 56)
 		grid.add_child(btn)
@@ -139,8 +150,8 @@ func _build_content() -> void:
 	root.add_child(v_spacer_bottom)
 
 
-func _make_pill(text: String) -> Panel:
-	var panel := Panel.new()
+func _make_pill(text: String) -> PanelContainer:
+	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0, 0, 0, 0.55)
 	style.border_color = UiFont.GOLD
@@ -202,14 +213,6 @@ func _make_main_button() -> Button:
 	container.anchors_preset = Control.PRESET_FULL_RECT
 	btn.add_child(container)
 
-	var icon := Label.new()
-	icon.text = "⚔"
-	icon.add_theme_font_override("font", UiFont.font())
-	icon.add_theme_font_size_override("font_size", 28)
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	container.add_child(icon)
-
 	var label := UiFont.label("出撃", 24, UiFont.PAPER)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -259,14 +262,15 @@ func _make_sub_button(label: String, icon: String, callback: Callable) -> Button
 	container.anchors_preset = Control.PRESET_FULL_RECT
 	btn.add_child(container)
 
-	var icon_label := Label.new()
-	icon_label.text = icon
-	icon_label.add_theme_font_override("font", UiFont.font())
-	icon_label.add_theme_font_size_override("font_size", 24)
-	icon_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	icon_label.custom_minimum_size = Vector2(28, 28)
-	container.add_child(icon_label)
+	if icon != "":
+		var icon_label := Label.new()
+		icon_label.text = icon
+		icon_label.add_theme_font_override("font", UiFont.font())
+		icon_label.add_theme_font_size_override("font_size", 24)
+		icon_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon_label.custom_minimum_size = Vector2(28, 28)
+		container.add_child(icon_label)
 
 	var text_label := UiFont.label(label, 18, UiFont.PAPER)
 	text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -285,33 +289,25 @@ func _open_name_entry() -> void:
 		return
 	var overlay := Control.new()
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.anchors_preset = Control.PRESET_FULL_RECT
 	add_child(overlay)
+	UiFont.full_rect(overlay)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.66)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	dim.anchors_preset = Control.PRESET_FULL_RECT
 	overlay.add_child(dim)
+	UiFont.full_rect(dim)
+	var center := CenterContainer.new()
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(center)
+	UiFont.full_rect(center)
 	var panel := PanelContainer.new()
-	panel.anchor_left = 0.5
-	panel.anchor_top = 0.5
-	panel.anchor_right = 0.5
-	panel.anchor_bottom = 0.5
-	panel.offset_left = -160
-	panel.offset_top = -140
-	panel.offset_right = 160
-	panel.offset_bottom = 140
+	panel.custom_minimum_size = Vector2(340, 0)
 	panel.add_theme_stylebox_override("panel", UiFont.style(Color(0.12, 0.1, 0.08, 0.95), UiFont.GOLD, 2, 16))
-	overlay.add_child(panel)
+	center.add_child(panel)
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 14)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.anchors_preset = Control.PRESET_FULL_RECT
-	col.add_theme_constant_override("margin_left", 24)
-	col.add_theme_constant_override("margin_right", 24)
-	col.add_theme_constant_override("margin_top", 20)
-	col.add_theme_constant_override("margin_bottom", 20)
 	panel.add_child(col)
 	var heading := UiFont.label("名前を決めてね", 26, UiFont.GOLD)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -324,6 +320,7 @@ func _open_name_entry() -> void:
 	var edit := LineEdit.new()
 	edit.max_length = 10
 	edit.placeholder_text = "例： なつき"
+	edit.text = str(SaveStore.data.get("display_name", ""))
 	edit.add_theme_font_override("font", UiFont.font())
 	edit.add_theme_font_size_override("font_size", 24)
 	edit.add_theme_color_override("font_color", UiFont.INK)
@@ -358,6 +355,10 @@ func _open_name_entry() -> void:
 
 func _submit_name(raw: String) -> void:
 	var text := raw.strip_edges()
+	if text == "":
+		if _name_hint != null:
+			_name_hint.text = "1〜10文字で入力してね"
+		return
 	if SaveStore.set_display_name(text):
 		_build()
 		return
@@ -366,11 +367,14 @@ func _submit_name(raw: String) -> void:
 
 
 func _close_name_entry() -> void:
+	if str(SaveStore.data.get("display_name", "")) == "":
+		SaveStore.skip_display_name()
 	if _name_panel != null:
 		_name_panel.visible = false
 
 
 func _start() -> void:
+	SaveStore.clear_fragment_notice()
 	get_tree().change_scene_to_file("res://scenes/select.tscn")
 
 

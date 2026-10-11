@@ -17,9 +17,18 @@ func _idle_path(who: String) -> String:
 
 
 func _ready() -> void:
+	_restore_unclaimed_result()
 	_build()
 	_sync_yen()
 	_resolve()
+
+
+func _restore_unclaimed_result() -> void:
+	if not SaveStore.last_result.is_empty():
+		return
+	var saved = SaveStore.data.get("unclaimed_run", null)
+	if typeof(saved) == TYPE_DICTIONARY:
+		SaveStore.last_result = saved.duplicate(true)
 
 
 func _build() -> void:
@@ -165,24 +174,18 @@ func _resolve() -> void:
 		_fragment.text = ""
 		return
 
-	_reward = SaveStore.reward_fragments(str(result.get("outcome", "")), int(result.get("kills", 0)))
-	var locked := SaveStore.locked_friends()
-
-	if _reward <= 0:
-		_finish("獲得かけらなし")
-	elif locked.is_empty():
-		var yen := _reward * Balance.FRAGMENT_EXCHANGE
-		SaveStore.add_yen(yen)
-		_finish("余剰かけらを %d イェンに交換" % yen)
-	elif locked.size() == 1:
-		var who := str(locked[0])
-		var info := SaveStore.grant_fragments(who, _reward)
-		_finish(_grant_line(who, info))
-	else:
+	var claim: Dictionary = SaveStore.claim_unclaimed("")
+	if str(claim.get("state", "")) == "choice":
+		_reward = int(claim.get("reward", 0))
 		_fragment.text = "かけら %d 個  /  解放先を選択" % _reward
 		_set_nav(false)
 		_choice.add_child(_pick_button(Balance.CHAR_TAKETCHI))
 		_choice.add_child(_pick_button(Balance.CHAR_KENNY))
+		return
+	if str(claim.get("state", "")) != "done":
+		_fragment.text = ""
+		return
+	_finish(str(claim.get("note", "")))
 
 
 func _pick_button(who: String) -> Button:
@@ -196,21 +199,14 @@ func _pick_button(who: String) -> Button:
 func _give(who: String) -> void:
 	if bool(SaveStore.last_result.get("fragment_done", false)):
 		return
-	var info := SaveStore.grant_fragments(who, _reward)
+	var claim: Dictionary = SaveStore.claim_unclaimed(who)
+	if str(claim.get("state", "")) != "done":
+		return
 	for child in _choice.get_children():
 		_choice.remove_child(child)
 		child.free()
 	_set_nav(true)
-	_finish(_grant_line(who, info))
-
-
-func _grant_line(who: String, info: Dictionary) -> String:
-	var line := "%s  かけら +%d（%d / 5）" % [who, int(info.applied), SaveStore.fragments_of(who)]
-	if bool(info.unlocked):
-		line += "  加入"
-	if int(info.yen) > 0:
-		line += "  換金 +%d イェン" % int(info.yen)
-	return line
+	_finish(str(claim.get("note", "")))
 
 
 func _finish(note: String) -> void:

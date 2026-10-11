@@ -40,6 +40,8 @@ func _process(_delta: float) -> bool:
 
 
 func _check_bounds(node: Node, in_scroll: bool) -> void:
+	if node is CanvasItem and not (node as CanvasItem).is_visible_in_tree():
+		return
 	var bounds: Rect2 = root.get_visible_rect()
 	if node is Control and node != current and not in_scroll:
 		var r: Rect2 = node.get_global_rect()
