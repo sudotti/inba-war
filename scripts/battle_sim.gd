@@ -12,6 +12,7 @@ class Actor extends RefCounted:
 	var speed: float
 	var touch: int
 	var radius: float
+	var hurt_radius: float = 0.0
 	var stun: float
 	var knockback_scale: float
 	var base_speed: float
@@ -413,7 +414,7 @@ func _move_boss(actor: Actor, dt: float) -> void:
 			actor.target_pos = player_pos
 			actor.state_left = 0.72
 			return
-		_move_boss_range(actor, 250.0, dt)
+		_move_boss_range(actor, 190.0, dt)
 		return
 	if actor.attack_timer <= 0.0:
 		actor.target_pos = player_pos
@@ -424,7 +425,7 @@ func _move_boss(actor: Actor, dt: float) -> void:
 			actor.attack_state = "volley_windup"
 			actor.state_left = 0.82
 		return
-	_move_boss_range(actor, 290.0, dt)
+	_move_boss_range(actor, 175.0, dt)
 
 
 func _move_teacher(actor: Actor, dt: float) -> void:
@@ -629,8 +630,8 @@ func _attack() -> void:
 	var blast := base_knockback * (1.0 + 0.15 * float(levels[Balance.BUTTO]))
 	var reached: Array[Actor] = []
 	for actor in enemies:
-		# 射程の円の中は、敵の中心までの距離。
-		if player_pos.distance_to(actor.pos) <= attack_radius:
+		# ボスは絵が大きい。足元の点ではなく、見えている体まで届いたら当たる。
+		if player_pos.distance_to(actor.pos) <= attack_radius + actor.hurt_radius:
 			reached.append(actor)
 	var dead: Array[Actor] = []
 	for actor in reached:
@@ -647,7 +648,7 @@ func _special_sweep() -> void:
 	var damage := floori(float(attack_damage_now()) * Balance.SPECIAL_MASSA_DAMAGE_SCALE)
 	var reached: Array[Actor] = []
 	for actor in enemies:
-		if player_pos.distance_to(actor.pos) <= Balance.SPECIAL_MASSA_RADIUS:
+		if player_pos.distance_to(actor.pos) <= Balance.SPECIAL_MASSA_RADIUS + actor.hurt_radius:
 			reached.append(actor)
 	var dead: Array[Actor] = []
 	for actor in reached:
@@ -852,6 +853,7 @@ func _make_actor(kind: String, elapsed: float) -> Actor:
 	actor.touch = int(stats.touch)
 	actor.base_touch = actor.touch
 	actor.radius = float(stats.radius)
+	actor.hurt_radius = float(stats.get("hurt_radius", 0.0))
 	actor.knockback_scale = float(stats.knockback_scale)
 	actor.stun = 0.0
 	if kind == Balance.KIND_TANK:

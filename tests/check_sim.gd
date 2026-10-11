@@ -227,6 +227,7 @@ func _specials() -> void:
 	_eq(raid.boss_alert_kind, Balance.KIND_NIMOTON, "boss alert identity")
 	_true(raid.current_boss() != null, "boss health target available")
 	_true(raid.enemy_seen_this_run.has(Balance.KIND_NIMOTON), "boss enters bestiary encounter log")
+	_boss_body_takes_hits()
 
 
 func _combat() -> void:
@@ -488,6 +489,24 @@ func _spawn_and_round() -> void:
 	_true(sim.max_alive_seen <= 60, "cap across the round")
 	for actor in sim.enemies:
 		_true(sim.player_pos.distance_to(actor.pos) <= 900.0, "no leftover beyond 900")
+
+
+func _boss_body_takes_hits() -> void:
+	var gaps := {Balance.KIND_NIMOTON: 210.0, Balance.KIND_KASSEN: 190.0}
+	for kind in gaps:
+		var sim = BattleSim.new(Balance.CHAR_TAKETCHI)
+		sim.time = 40.0
+		var actor = sim._make_actor(kind, sim.time)
+		actor.pos = sim.player_pos + Vector2(float(gaps[kind]), 0.0)
+		sim.enemies.append(actor)
+		var before: int = actor.hp
+		sim._attack()
+		_true(actor.hp < before, "%s loses hp inside the drawn body" % kind)
+		_true(actor.hp > 0, "%s survives one swing" % kind)
+		actor.pos = sim.player_pos + Vector2(420.0, 0.0)
+		var far: int = actor.hp
+		sim._attack()
+		_eq(actor.hp, far, "%s is safe outside the body" % kind)
 
 
 func _boss_raid() -> void:

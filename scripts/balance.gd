@@ -192,17 +192,19 @@ const ENEMIES := {
 		"knockback_scale": 0.35,
 	},
 	KIND_NIMOTON: {
-		"hp": 1280,
+		"hp": 560,
 		"speed": 115.0,
 		"touch": 32,
 		"radius": 62.0,
+		"hurt_radius": 168.0,
 		"knockback_scale": 0.08,
 	},
 	KIND_KASSEN: {
-		"hp": 1040,
+		"hp": 480,
 		"speed": 140.0,
 		"touch": 38,
 		"radius": 54.0,
+		"hurt_radius": 132.0,
 		"knockback_scale": 0.12,
 	},
 	KIND_TEACHER: {
