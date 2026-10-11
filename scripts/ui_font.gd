@@ -97,21 +97,18 @@ static func button(text: String, size: int = 28) -> Button:
 
 
 static func royal_button(text: String, size: int = 24, primary: bool = false) -> Button:
-	var node := Button.new()
-	node.text = text
-	node.add_theme_font_override("font", font())
-	node.add_theme_font_size_override("font_size", size)
-	var text_color := PAPER if not primary else Color("1c1814")
-	node.add_theme_color_override("font_color", text_color)
-	node.add_theme_color_override("font_hover_color", text_color)
-	node.add_theme_color_override("font_pressed_color", text_color)
-	node.add_theme_color_override("font_focus_color", text_color)
-	node.add_theme_color_override("font_disabled_color", Color("5c564c"))
+	# ボタン自身の text は、ケータイのブラウザだと空欄のまま残ることがある。
+	# タイトルの出撃ボタンと同じく、字は Label で描く。
+	var node := RoyalButton.new()
+	node.focus_mode = Control.FOCUS_NONE
+	node.mouse_filter = Control.MOUSE_FILTER_STOP
+	node.enabled_color = INK if primary else PAPER
+	node.disabled_color = Color("8d8478") if primary else Color("6e675d")
 	if primary:
-		node.add_theme_stylebox_override("normal", style(glass_fill(0.32), glass_border(0.95), 1, 12))
-		node.add_theme_stylebox_override("hover", style(glass_fill(0.48), Color("fff0c2"), 1, 12))
-		node.add_theme_stylebox_override("pressed", style(glass_fill(0.18), glass_border(0.7), 1, 12))
-		node.add_theme_stylebox_override("focus", style(glass_fill(0.32), glass_border(0.95), 1, 12))
+		node.add_theme_stylebox_override("normal", style(GOLD, BRASS, 2, 12))
+		node.add_theme_stylebox_override("hover", style(Color("fff0c2"), BRASS, 2, 12))
+		node.add_theme_stylebox_override("pressed", style(Color("e2b45a"), BRASS, 2, 12))
+		node.add_theme_stylebox_override("focus", style(GOLD, BRASS, 2, 12))
 	else:
 		node.add_theme_stylebox_override("normal", style(glass_fill(0.18), glass_border(0.8), 1, 12))
 		node.add_theme_stylebox_override("hover", style(glass_fill(0.32), Color("fff0c2"), 1, 12))
@@ -119,7 +116,28 @@ static func royal_button(text: String, size: int = 24, primary: bool = false) ->
 		node.add_theme_stylebox_override("focus", style(glass_fill(0.18), glass_border(0.8), 1, 12))
 	node.add_theme_stylebox_override("disabled", style(Color("151515"), Color("333333"), 1, 12))
 	node.custom_minimum_size = Vector2(240, 64)
+	var caption := label(text, size, node.enabled_color)
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	node.add_child(caption)
+	full_rect(caption)
+	node.caption = caption
 	return node
+
+
+class RoyalButton extends Button:
+	var caption: Label
+	var enabled_color := Color.WHITE
+	var disabled_color := Color("8d8478")
+	var _painted_disabled := false
+
+
+	func _notification(what: int) -> void:
+		if what != NOTIFICATION_DRAW or caption == null or _painted_disabled == disabled:
+			return
+		_painted_disabled = disabled
+		caption.add_theme_color_override("font_color", disabled_color if disabled else enabled_color)
 
 
 static func royal_panel(fill: Color = ROYAL, border: Color = BRASS, width: int = 3, radius: int = 16) -> StyleBoxFlat:

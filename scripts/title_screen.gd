@@ -149,6 +149,10 @@ func _build_content() -> void:
 	v_spacer_bottom.custom_minimum_size = Vector2(0, 24)
 	root.add_child(v_spacer_bottom)
 
+	var build := UiFont.label("版c", 14, UiFont.BRASS)
+	build.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(build)
+
 
 func _make_pill(text: String) -> PanelContainer:
 	var panel := PanelContainer.new()
@@ -210,8 +214,8 @@ func _make_main_button() -> Button:
 	container.alignment = BoxContainer.ALIGNMENT_CENTER
 	container.add_theme_constant_override("separation", 10)
 	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	container.anchors_preset = Control.PRESET_FULL_RECT
 	btn.add_child(container)
+	UiFont.full_rect(container)
 
 	var label := UiFont.label("出撃", 24, UiFont.PAPER)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -259,8 +263,8 @@ func _make_sub_button(label: String, icon: String, callback: Callable) -> Button
 	container.alignment = BoxContainer.ALIGNMENT_CENTER
 	container.add_theme_constant_override("separation", 8)
 	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	container.anchors_preset = Control.PRESET_FULL_RECT
 	btn.add_child(container)
+	UiFont.full_rect(container)
 
 	if icon != "":
 		var icon_label := Label.new()

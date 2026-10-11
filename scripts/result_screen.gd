@@ -37,15 +37,15 @@ func _build() -> void:
 
 	var night := ColorRect.new()
 	night.color = UiFont.NIGHT
-	night.anchors_preset = Control.PRESET_FULL_RECT
 	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(night)
+	UiFont.full_rect(night)
 
 	_main_margin = MarginContainer.new()
-	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
 	_main_margin.add_theme_constant_override("margin_left", 24)
 	_main_margin.add_theme_constant_override("margin_right", 24)
 	add_child(_main_margin)
+	UiFont.full_rect(_main_margin)
 
 	var root := VBoxContainer.new()
 	root.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -122,7 +122,7 @@ func _build() -> void:
 			col.add_child(UiFont.label("ボス撃破  ニーモトン %d / カッセン %d" % [int(result.get("kills_nimoton", 0)), int(result.get("kills_kassen", 0))], 18, UiFont.BRASS))
 		var teachers := int(result.get("kills_teacher", 0))
 		if teachers > 0:
-			col.add_child(UiFont.label("先生撃破  %d" % teachers, 18, UiFont.BRASS))
+			col.add_child(UiFont.label("%s撃破  %d" % [Balance.ENEMY_NAME[Balance.KIND_TEACHER], teachers], 18, UiFont.BRASS))
 
 	_fragment = UiFont.label("", 22, UiFont.YELLOW)
 	_fragment.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

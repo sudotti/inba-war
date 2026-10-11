@@ -14,18 +14,19 @@ func _ready() -> void:
 func _build() -> void:
 	for child in get_children():
 		child.queue_free()
+	UiFont.full_rect(self)
 
 	var background := ColorRect.new()
 	background.color = UiFont.NIGHT
-	background.anchors_preset = Control.PRESET_FULL_RECT
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
+	UiFont.full_rect(background)
 
 	_main_margin = MarginContainer.new()
-	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
 	_main_margin.add_theme_constant_override("margin_left", 24)
 	_main_margin.add_theme_constant_override("margin_right", 24)
 	add_child(_main_margin)
+	UiFont.full_rect(_main_margin)
 
 	var root := VBoxContainer.new()
 	root.alignment = BoxContainer.ALIGNMENT_CENTER

@@ -4,7 +4,7 @@ const Balance = preload("res://scripts/balance.gd")
 const UiFont = preload("res://scripts/ui_font.gd")
 const LOCK_ART := "res://assets/ui/lock.png"
 
-var _entries: VBoxContainer
+var _entries: GridContainer
 var _portrait: TextureRect
 var _name: Label
 var _role: Label
@@ -24,21 +24,24 @@ func _ready() -> void:
 func _build() -> void:
 	for child in get_children():
 		child.queue_free()
+	UiFont.full_rect(self)
 
 	var background := ColorRect.new()
 	background.color = UiFont.NIGHT
-	background.anchors_preset = Control.PRESET_FULL_RECT
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
+	UiFont.full_rect(background)
 
 	_main_margin = MarginContainer.new()
-	_main_margin.anchors_preset = Control.PRESET_FULL_RECT
 	_main_margin.add_theme_constant_override("margin_left", 24)
 	_main_margin.add_theme_constant_override("margin_right", 24)
+	_main_margin.add_theme_constant_override("margin_top", 12)
+	_main_margin.add_theme_constant_override("margin_bottom", 12)
 	add_child(_main_margin)
+	UiFont.full_rect(_main_margin)
 
 	var root := VBoxContainer.new()
-	root.alignment = BoxContainer.ALIGNMENT_CENTER
+	root.alignment = BoxContainer.ALIGNMENT_BEGIN
 	root.add_theme_constant_override("separation", 12)
 	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -58,7 +61,9 @@ func _build() -> void:
 	var count: int = SaveStore.data.enemy_seen.size()
 	header.add_child(UiFont.label("遭遇 %d / %d" % [count, Balance.ENEMY_KINDS.size()], 20, UiFont.BRASS))
 
-	var back := UiFont.button("戻る", 20)
+	header.add_child(UiFont.label("版c", 14, UiFont.BRASS))
+
+	var back := UiFont.royal_button("戻る", 20)
 	back.custom_minimum_size = Vector2(140, 54)
 	back.pressed.connect(_back)
 	header.add_child(back)
@@ -70,37 +75,29 @@ func _build() -> void:
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(body)
 
-	# List panel
+	# 6体を2列で全部出す。ScrollContainer はケータイでドラッグが死に、ボタンの text も空欄になる。
 	var list_panel := PanelContainer.new()
 	list_panel.add_theme_stylebox_override("panel", UiFont.style(UiFont.CARD, UiFont.BRASS_DEEP, 2, 4))
+	list_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(list_panel)
 
 	var list_margin := MarginContainer.new()
-	list_margin.add_theme_constant_override("margin_left", 12)
-	list_margin.add_theme_constant_override("margin_right", 12)
-	list_margin.add_theme_constant_override("margin_top", 14)
-	list_margin.add_theme_constant_override("margin_bottom", 14)
+	list_margin.add_theme_constant_override("margin_left", 10)
+	list_margin.add_theme_constant_override("margin_right", 10)
+	list_margin.add_theme_constant_override("margin_top", 10)
+	list_margin.add_theme_constant_override("margin_bottom", 10)
 	list_panel.add_child(list_margin)
 
-	var list_col := VBoxContainer.new()
-	list_col.add_theme_constant_override("separation", 8)
-	list_margin.add_child(list_col)
-
-	list_col.add_child(UiFont.label("遭遇した敵", 22, UiFont.BRASS))
-
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	list_col.add_child(scroll)
-
-	_entries = VBoxContainer.new()
-	_entries.add_theme_constant_override("separation", 6)
+	_entries = GridContainer.new()
+	_entries.columns = 2
+	_entries.add_theme_constant_override("h_separation", 8)
+	_entries.add_theme_constant_override("v_separation", 8)
 	_entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_entries)
+	list_margin.add_child(_entries)
 
 	# Detail panel
 	var detail := VBoxContainer.new()
-	detail.alignment = BoxContainer.ALIGNMENT_CENTER
+	detail.alignment = BoxContainer.ALIGNMENT_BEGIN
 	detail.add_theme_constant_override("separation", 10)
 	detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -113,7 +110,7 @@ func _build() -> void:
 	detail.add_child(portrait_panel)
 
 	_portrait = TextureRect.new()
-	_portrait.custom_minimum_size = Vector2(0, 280)
+	_portrait.custom_minimum_size = Vector2(0, 180)
 	_portrait.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -159,15 +156,35 @@ func _refresh() -> void:
 		var seen: bool = SaveStore.data.enemy_seen.has(kind)
 		var caption := str(Balance.ENEMY_NAME[kind]) if seen else "？？？？？"
 		var kills := int(SaveStore.data.enemy_kills.get(kind, 0))
-		var button := UiFont.button("%s   %02d" % [caption, kills], 18)
-		button.custom_minimum_size = Vector2(0, 54)
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.add_theme_stylebox_override("normal", UiFont.style(UiFont.BRASS if kind == _selected else UiFont.CARD, UiFont.BRASS_DEEP, 1, 4))
-		button.add_theme_color_override("font_color", UiFont.INK if kind == _selected else UiFont.PAPER)
-		button.pressed.connect(_select.bind(kind))
-		_entries.add_child(button)
+		_entries.add_child(_entry_button(kind, "%s  %02d" % [caption, kills]))
 
 	_show_entry(_selected)
+
+
+func _entry_button(kind: String, caption: String) -> Button:
+	var selected := kind == _selected
+	var fill := UiFont.BRASS if selected else Color("2a241c")
+	var ink := UiFont.INK if selected else UiFont.PAPER
+	var button := Button.new()
+	button.text = ""
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(0, 72)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.set_meta("bestiary_entry", kind)
+	var box := UiFont.style(fill, UiFont.BRASS_DEEP, 2, 8)
+	button.add_theme_stylebox_override("normal", box)
+	button.add_theme_stylebox_override("hover", box)
+	button.add_theme_stylebox_override("pressed", box)
+	button.add_theme_stylebox_override("focus", box)
+	var caption_label := UiFont.label(caption, 18, ink)
+	caption_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	caption_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	caption_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(caption_label)
+	UiFont.full_rect(caption_label)
+	button.pressed.connect(_select.bind(kind))
+	return button
 
 
 func _select(kind: String) -> void:

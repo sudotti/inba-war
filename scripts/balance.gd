@@ -69,7 +69,7 @@ const KIND_KASSEN := "boss_kassen"
 const KIND_TEACHER := "teacher"
 const BOSS_KINDS: Array[String] = [KIND_NIMOTON, KIND_KASSEN]
 const RAID_KINDS: Array[String] = [KIND_TEACHER]
-const BOSS_SPAWN_CHANCE := 0.12
+const BOSS_SPAWN_CHANCE := 0.25
 const BOSS_NAME := {
 	KIND_NIMOTON: "ニーモトン",
 	KIND_KASSEN: "カッセン",
@@ -89,7 +89,7 @@ const ENEMY_NAME := {
 	KIND_TANK: "印旛沼の怪獣",
 	KIND_NIMOTON: "ニーモトン",
 	KIND_KASSEN: "カッセン",
-	KIND_TEACHER: "先生",
+	KIND_TEACHER: "非常勤講師",
 }
 const ENEMY_DESCRIPTION := {
 	KIND_NORMAL: "数で迫る黒服。囲まれる前に距離を取れ。",
@@ -97,7 +97,7 @@ const ENEMY_DESCRIPTION := {
 	KIND_TANK: "巨体と一撃が脅威。吹き飛ばしにくい。",
 	KIND_NIMOTON: "毒液で地面を侵し、手下を覚醒させる。",
 	KIND_KASSEN: "バレーボール弾と強烈な蹴りで襲う。",
-	KIND_TEACHER: "校庭に乱入。教鞭を振り回し、スライディングで突っ込む。",
+	KIND_TEACHER: "校庭に現れる非常勤。教鞭を振り回し、スライディングで突っ込む。",
 }
 const ENEMY_SPECIAL := {
 	KIND_TEACHER: "スライディング突進",
@@ -247,7 +247,7 @@ const KIND_LABEL := {
 	KIND_TANK: "耐久",
 	KIND_NIMOTON: "ニーモトン",
 	KIND_KASSEN: "カッセン",
-	KIND_TEACHER: "先生",
+	KIND_TEACHER: "非常勤講師",
 }
 
 const UPGRADE_NAME := {

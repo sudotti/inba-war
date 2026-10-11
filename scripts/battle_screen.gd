@@ -209,8 +209,10 @@ func _input(event: InputEvent) -> void:
 			_touch_count += 1
 		else:
 			_touch_count = maxi(0, _touch_count - 1)
+		# タッチとマウスの到着順が前後しても、指を離したあとに歩き続けない。
+		_mouse_down = false
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if _touch_count == 0:
+		if _touch_count == 0 and not DisplayServer.is_touchscreen_available():
 			_mouse_down = event.pressed
 	elif event is InputEventKey and event.pressed and not event.echo and sim != null:
 		var key := int(event.physical_keycode)
@@ -239,7 +241,9 @@ func _move_vector() -> Vector2:
 		key.y += 1.0
 	if key.length() > 0.0:
 		return key.normalized()
-	if _mouse_down and _touch_count == 0 and not sim.build_open:
+	if _mouse_down and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_mouse_down = false
+	if _mouse_down and _touch_count == 0 and not sim.build_open and not DisplayServer.is_touchscreen_available():
 		var center: Vector2 = get_viewport().get_visible_rect().size * 0.5
 		var player_screen: Vector2 = center + (Vector2(sim.player_pos) - camera.global_position) * camera.zoom
 		var delta: Vector2 = get_viewport().get_mouse_position() - player_screen
@@ -1097,6 +1101,7 @@ func _build_hud() -> void:
 	add_child(layer)
 
 	var root := Control.new()
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.offset_left = 0
 	root.offset_top = 0
@@ -1515,6 +1520,7 @@ func _build_boss_hud() -> void:
 	_fill(root)
 
 	_boss_margin = MarginContainer.new()
+	_boss_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_boss_margin)
 	_fill(_boss_margin)
 	_boss_margin.add_theme_constant_override("margin_left", 24)

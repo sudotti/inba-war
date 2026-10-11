@@ -44,6 +44,8 @@ func _check_layout() -> void:
 		_check_select()
 	elif scene == "res://scenes/shop.tscn":
 		_check_shop()
+	elif scene == "res://scenes/bestiary.tscn":
+		_check_bestiary()
 	elif scene == "res://scenes/battle.tscn":
 		_check_battle()
 
@@ -73,6 +75,50 @@ func _check_shop() -> void:
 	if not _has_buy_card(current):
 		print("SHOP missing item card")
 		fails += 1
+	if _find_scroll(current) != null:
+		print("SHOP still scrolls its goods")
+		fails += 1
+	if not _label_text(current, "印旛中学校制服"):
+		print("SHOP uniform name missing")
+		fails += 1
+	var goods := _meta_nodes(current, "shop_good")
+	if goods.is_empty():
+		print("SHOP goods missing")
+		fails += 1
+	for good in goods:
+		var rect: Rect2 = (good as Control).get_global_rect()
+		if rect.position.y > 640.0 or rect.end.y > 980.0 or rect.size.y < 40.0:
+			print("SHOP good off the top half ", rect)
+			fails += 1
+
+
+func _check_bestiary() -> void:
+	if current is Control and (current as Control).size.y < 400.0:
+		print("BESTIARY root collapsed")
+		fails += 1
+	if _find_scroll(current) != null:
+		print("BESTIARY still scrolls its list")
+		fails += 1
+	var entries := _meta_nodes(current, "bestiary_entry")
+	if entries.size() != Balance.ENEMY_KINDS.size():
+		print("BESTIARY entries missing ", entries.size())
+		fails += 1
+	for entry in entries:
+		var button := entry as Button
+		var rect: Rect2 = button.get_global_rect()
+		if button.text != "":
+			print("BESTIARY entry uses Button.text")
+			fails += 1
+		if rect.position.y > 640.0 or rect.size.y < 48.0:
+			print("BESTIARY entry off the top half ", rect)
+			fails += 1
+		var caption := ""
+		for child in button.get_children():
+			if child is Label:
+				caption = (child as Label).text
+		if caption == "":
+			print("BESTIARY entry caption blank")
+			fails += 1
 
 
 func _check_battle() -> void:
@@ -125,6 +171,34 @@ func _has_buy_card(node: Node) -> bool:
 			return true
 	for child in node.get_children():
 		if _has_buy_card(child):
+			return true
+	return false
+
+
+func _meta_nodes(node: Node, key: String) -> Array:
+	var found: Array = []
+	if node.has_meta(key):
+		found.append(node)
+	for child in node.get_children():
+		found.append_array(_meta_nodes(child, key))
+	return found
+
+
+func _find_scroll(node: Node) -> ScrollContainer:
+	if node is ScrollContainer:
+		return node
+	for child in node.get_children():
+		var found := _find_scroll(child)
+		if found != null:
+			return found
+	return null
+
+
+func _label_text(node: Node, text: String) -> bool:
+	if node is Label and (node as Label).text == text:
+		return true
+	for child in node.get_children():
+		if _label_text(child, text):
 			return true
 	return false
 
