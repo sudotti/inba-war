@@ -294,6 +294,7 @@ func _fresh() -> Dictionary:
 			Balance.KIND_TANK: 0,
 			Balance.KIND_NIMOTON: 0,
 			Balance.KIND_KASSEN: 0,
+			Balance.KIND_TEACHER: 0,
 		},
 		"local_scores": [],
 		"selected": Balance.CHAR_MASSA,
@@ -372,17 +373,40 @@ func _write() -> void:
 		return
 	file.store_string(JSON.stringify(data, "\t"))
 	file.close()
-	if FileAccess.file_exists(path):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
-	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(path))
+	if not _replace_file(tmp, path):
+		push_error("セーブを置けません: %s" % path)
+		return
+	_flush_web_save()
 
 
 func _park_corrupt() -> void:
-	var src := ProjectSettings.globalize_path(path)
-	var bak := ProjectSettings.globalize_path(path + ".bak")
-	if FileAccess.file_exists(bak):
-		DirAccess.remove_absolute(bak)
-	DirAccess.rename_absolute(src, bak)
+	if not _replace_file(path, path + ".bak"):
+		push_error("壊れたセーブを退避できません: %s" % path)
+
+
+func _replace_file(src: String, dst: String) -> bool:
+	var src_abs := ProjectSettings.globalize_path(src)
+	var dst_abs := ProjectSettings.globalize_path(dst)
+	if FileAccess.file_exists(dst):
+		DirAccess.remove_absolute(dst_abs)
+	if DirAccess.rename_absolute(src_abs, dst_abs) == OK and FileAccess.file_exists(dst):
+		return true
+	var text := FileAccess.get_file_as_string(src)
+	var out := FileAccess.open(dst, FileAccess.WRITE)
+	if out == null:
+		return false
+	out.store_string(text)
+	out.close()
+	if src != dst and FileAccess.file_exists(src):
+		DirAccess.remove_absolute(src_abs)
+	return FileAccess.file_exists(dst)
+
+
+func _flush_web_save() -> void:
+	if not OS.has_feature("web"):
+		return
+	if ClassDB.class_exists("JavaScriptBridge") and ClassDB.class_has_method("JavaScriptBridge", "force_fs_sync"):
+		JavaScriptBridge.force_fs_sync()
 
 
 func _now() -> String:

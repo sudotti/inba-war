@@ -14,7 +14,7 @@ config/name="印旛村戦線"
 config/version="0.1.0"
 run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
-config/icon="res://icon.svg"
+config/icon="res://icon.png"
 
 [autoload]
 
@@ -27,7 +27,7 @@ window/size/viewport_height=1280
 window/size/window_width_override=720
 window/size/window_height_override=1280
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep_width"
+window/stretch/aspect="keep"
 window/handheld/orientation=1
 
 [rendering]
