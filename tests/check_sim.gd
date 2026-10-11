@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_combat()
 	_specials()
 	_spawn_and_round()
+	_boss_raid()
 	_save()
 	_shop()
 	_kite()
@@ -486,6 +487,76 @@ func _spawn_and_round() -> void:
 	_true(sim.max_alive_seen <= 60, "cap across the round")
 	for actor in sim.enemies:
 		_true(sim.player_pos.distance_to(actor.pos) <= 900.0, "no leftover beyond 900")
+
+
+func _boss_raid() -> void:
+	var shown := Vector2(560, 995)
+	for kind in [Balance.KIND_NIMOTON, Balance.KIND_KASSEN]:
+		var sim = BattleSim.new()
+		sim.rng.seed = 5
+		sim.player_pos = Vector2(800, 550)
+		var cam := _portrait_cam(sim.player_pos, shown)
+		sim.view_rect = Rect2(cam - shown * 0.5, shown)
+		_true(sim._spawn_kind(kind, 90.0), "%s spawns off the portrait camera" % kind)
+		var actor = sim.current_boss()
+		_true(actor != null and actor.kind == kind, "%s is the live boss" % kind)
+		_true(not sim.view_rect.grow(Balance.SPAWN_OUTSIDE_MARGIN).has_point(actor.pos), "%s enters outside the view" % kind)
+		_eq(sim.boss_alert_serial, 1, "%s announces" % kind)
+		_eq(sim.boss_alert_kind, kind, "%s alert name" % kind)
+		sim.player_pos = Vector2(90, 90)
+		actor.pos = Vector2(1500, 1000)
+		sim._despawn_far()
+		_eq(_count_kind(sim, kind), 1, "%s is not despawned" % kind)
+
+	var blocked = BattleSim.new()
+	blocked.player_pos = Vector2(800, 550)
+	blocked.view_rect = Rect2(Vector2(-400, -400), Vector2(2400, 2000))
+	blocked.time = 10.0
+	blocked.boss_spawn_time = 10.0
+	blocked.boss_pending_kind = Balance.KIND_KASSEN
+	blocked._update_boss_raid()
+	_true(blocked.current_boss() == null, "covered field waits")
+	_true(not blocked.boss_spawn_attempted, "failed entrance is retried")
+	_eq(blocked.boss_pending_kind, Balance.KIND_KASSEN, "same boss waits")
+	blocked.view_rect = Rect2(blocked.player_pos - Vector2(30, 30), Vector2(60, 60))
+	blocked.boss_spawn_time = blocked.time
+	blocked._update_boss_raid()
+	_true(blocked.current_boss() != null and blocked.current_boss().kind == Balance.KIND_KASSEN, "retry places kassen")
+	_true(blocked.boss_spawn_attempted, "entrance completes")
+
+	var saw_n := 0
+	var saw_k := 0
+	var lost := 0
+	for seed in 300:
+		var sim = BattleSim.new()
+		sim.rng.seed = seed
+		sim.player_pos = Vector2(800, 550)
+		var cam := _portrait_cam(sim.player_pos, shown)
+		sim.view_rect = Rect2(cam - shown * 0.5, shown)
+		sim.time = 40.0
+		sim.boss_spawn_time = 40.0
+		sim._update_boss_raid()
+		var boss = sim.current_boss()
+		if boss != null:
+			if boss.kind == Balance.KIND_NIMOTON:
+				saw_n += 1
+			elif boss.kind == Balance.KIND_KASSEN:
+				saw_k += 1
+			if sim.view_rect.grow(Balance.SPAWN_OUTSIDE_MARGIN).has_point(boss.pos):
+				lost += 1
+		elif sim.boss_pending_kind != "":
+			lost += 1
+	_true(saw_n > 0, "nimoton raid can roll")
+	_true(saw_k > 0, "kassen raid can roll")
+	_eq(lost, 0, "a won roll places the boss off screen")
+	print("boss raids nimo=%d kassen=%d" % [saw_n, saw_k])
+
+
+func _portrait_cam(pos: Vector2, shown: Vector2) -> Vector2:
+	var cam := pos
+	cam.x = clampf(cam.x, shown.x * 0.5, Balance.FIELD_W - shown.x * 0.5)
+	cam.y = clampf(cam.y, shown.y * 0.5, Balance.FIELD_H - shown.y * 0.5)
+	return cam
 
 
 func _save() -> void:

@@ -56,6 +56,7 @@ var boss_alert_kind: String = ""
 var enemy_seen_this_run: Dictionary = {}
 var boss_spawn_time: float = 0.0
 var boss_spawn_attempted: bool = false
+var boss_pending_kind: String = ""
 var boss_damage_lock: float = 0.0
 
 
@@ -733,6 +734,9 @@ func _contact_raw() -> int:
 func _despawn_far() -> void:
 	var keep: Array[Actor] = []
 	for actor in enemies:
+		if Balance.BOSS_KINDS.has(actor.kind):
+			keep.append(actor)
+			continue
 		if player_pos.distance_to(actor.pos) > Balance.DESPAWN_DISTANCE:
 			continue
 		keep.append(actor)
@@ -803,14 +807,18 @@ func _update_boss_raid() -> void:
 	if enemies.size() >= Balance.MAX_ALIVE:
 		boss_spawn_time = time + 5.0
 		return
-	boss_spawn_attempted = true
-	if rng.randf() >= Balance.BOSS_SPAWN_CHANCE:
-		return
-	var nimoton_chance := 0.5
-	if character_id == Balance.CHAR_KENNY:
-		nimoton_chance = 0.35
-	var kind := Balance.KIND_NIMOTON if rng.randf() < nimoton_chance else Balance.KIND_KASSEN
-	_spawn_kind(kind, time)
+	if boss_pending_kind == "":
+		if rng.randf() >= Balance.BOSS_SPAWN_CHANCE:
+			boss_spawn_attempted = true
+			return
+		var nimoton_chance := 0.5
+		if character_id == Balance.CHAR_KENNY:
+			nimoton_chance = 0.35
+		boss_pending_kind = Balance.KIND_NIMOTON if rng.randf() < nimoton_chance else Balance.KIND_KASSEN
+	if _spawn_kind(boss_pending_kind, time):
+		boss_spawn_attempted = true
+	else:
+		boss_spawn_time = time + 3.0
 
 
 func _spawn_kind(kind: String, elapsed: float) -> bool:
@@ -818,6 +826,8 @@ func _spawn_kind(kind: String, elapsed: float) -> bool:
 		return false
 	var stats: Dictionary = Balance.ENEMIES[kind]
 	var found: Array = _find_spawn(float(stats.radius))
+	if found.is_empty() and (Balance.BOSS_KINDS.has(kind) or Balance.RAID_KINDS.has(kind)):
+		found = _intrusion_fallback(float(stats.radius))
 	if found.is_empty():
 		return false
 	var actor := _make_actor(kind, elapsed)
@@ -890,6 +900,25 @@ func _find_spawn(radius: float) -> Array:
 			continue
 		return [pos]
 	return []
+
+
+func _intrusion_fallback(radius: float) -> Array:
+	var center := view_rect.get_center()
+	if view_rect.size.x < 2.0 or view_rect.size.y < 2.0:
+		center = player_pos
+	var reach := maxf(view_rect.size.x, view_rect.size.y) * 0.5 + radius + 48.0
+	var dirs: Array[Vector2] = [Vector2.RIGHT, Vector2.LEFT, Vector2.DOWN, Vector2.UP]
+	var spots: Array[Vector2] = []
+	for dir in dirs:
+		var pos := _clamp_field(center + dir * reach, radius)
+		if view_rect.grow(Balance.SPAWN_OUTSIDE_MARGIN).has_point(pos):
+			continue
+		if pos.distance_to(player_pos) > Balance.SPAWN_MAX_DISTANCE:
+			continue
+		spots.append(pos)
+	if spots.is_empty():
+		return []
+	return [spots[rng.randi() % spots.size()]]
 
 
 func _kill(actor: Actor) -> void:

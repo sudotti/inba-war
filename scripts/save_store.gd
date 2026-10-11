@@ -1,7 +1,7 @@
 extends Node
 
 const Balance = preload("res://scripts/balance.gd")
-const DEFAULT_PATH := "user://inba_save.json"
+const DEFAULT_PATH := "user://inba_save_v3.json"
 
 var data: Dictionary = {}
 var last_result: Dictionary = {}

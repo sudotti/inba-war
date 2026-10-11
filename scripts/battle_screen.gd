@@ -22,7 +22,13 @@ const ART_FIELD_A := "res://assets/battle/field_a.png"
 const ART_FIELD_B := "res://assets/battle/field_b.png"
 const ART_COIN := "res://assets/battle/coin.png"
 const ART_TEACHER := "res://assets/battle/teacher.png"
+const SPECIAL_FONT := "res://assets/fonts/NotoSansJP-Bold.ttf"
 const CARD_H := 156.0
+const SPECIAL_TITLES := {
+	Balance.CHAR_MASSA: "たけだの鉄パイプ",
+	Balance.CHAR_TAKETCHI: "エニタイム",
+	Balance.CHAR_KENNY: "理学療法連脚",
+}
 
 var sim
 var camera: Camera2D
@@ -83,6 +89,10 @@ var _special_cut_in: Control
 var _special_face: TextureRect
 var _special_name: Label
 var _special_quote: Label
+var _special_band: PanelContainer
+var _special_dim: ColorRect
+var _special_wash: ColorRect
+var _special_streaks: Array[ColorRect] = []
 var _special_ring_left := 0.0
 var _special_phase := ""
 var _special_motion_left := 0.0
@@ -98,9 +108,9 @@ var _boss_banner_image: TextureRect
 var _boss_banner_name: Label
 var _boss_banner_action: Label
 var _boss_banner_tween: Tween
+var _boss_dim: ColorRect
 var _seen_boss_alert := 0
 var _boss_margin: MarginContainer
-var _special_margin: MarginContainer
 
 
 func _fill(c: Control) -> void:
@@ -156,6 +166,8 @@ func _process(dt: float) -> void:
 		if _special_motion_left <= 0.0:
 			_special_phase = ""
 			sim.finish_special_motion()
+	if _special_cut_in != null and _special_cut_in.visible:
+		_slide_special_streaks(dt)
 	if sim.finished:
 		_go_result()
 		return
@@ -409,14 +421,8 @@ func _draw_boss_telegraphs() -> void:
 
 func _draw() -> void:
 	_draw_ground()
-	_draw_special_aura()
+	_draw_special_back()
 	_draw_boss_telegraphs()
-	if _special_ring_left > 0.0:
-		var progress := 1.0 - _special_ring_left / Balance.SPECIAL_MASSA_MOTION_SECONDS
-		var start := -PI * 0.5 + progress * TAU
-		var radius := lerpf(84.0, Balance.SPECIAL_MASSA_RADIUS, progress)
-		draw_arc(sim.player_pos, radius, start, start + TAU * 0.96, 112, Color(1.0, 0.84, 0.3, 0.94 * (1.0 - progress * 0.38)), 20.0, true)
-		draw_arc(sim.player_pos, radius - 18.0, start + 0.7, start + TAU * 0.78, 96, Color(1.0, 0.97, 0.78, 0.78 * (1.0 - progress)), 7.0, true)
 	var shadow_r := 32.0 if str(sim.character_id) == Balance.CHAR_TAKETCHI else 24.0
 	_draw_shadow(sim.player_pos, shadow_r * (1.0 if _strike_age > 0.2 else 0.82))
 	for actor in sim.enemies:
@@ -501,6 +507,7 @@ func _draw() -> void:
 				var mid := foot + Vector2(0.0, -max_h * 0.42)
 				draw_line(mid + Vector2(-22, -16), mid + Vector2(22, 18), Color(1, 1, 1, spark), 6.0, true)
 				draw_line(mid + Vector2(20, -18), mid + Vector2(-18, 16), Color(1, 1, 1, spark), 6.0, true)
+	_draw_special_front()
 
 
 func _load_frames() -> void:
@@ -553,10 +560,10 @@ func _player_visual() -> Dictionary:
 		hop = 0.0
 		sway = 0.0
 		if _who == Balance.CHAR_MASSA:
-			rot = TAU * 2.0 * progress
-			hop = sin(progress * PI) * 24.0
-			sx = 1.0 + sin(progress * PI) * 0.2
-			sy = 1.0 - sin(progress * PI) * 0.14
+			rot = sin(progress * PI) * 0.62
+			hop = sin(progress * PI) * 18.0
+			sx = 1.0 + sin(progress * PI) * 0.16
+			sy = 1.0 - sin(progress * PI) * 0.08
 		elif _who == Balance.CHAR_TAKETCHI:
 			var strike := sin(progress * PI)
 			rot = -0.16 + strike * 0.25
@@ -578,78 +585,181 @@ func _player_visual() -> Dictionary:
 	return {"frame": frame, "hop": hop, "sway": sway, "face": _player_face, "tint": tint, "rot": rot, "sx": sx, "sy": sy, "lunge": lunge}
 
 
-func _draw_special_aura() -> void:
-	_draw_special_flames()
-	if _special_phase == "motion" and _special_motion_left > 0.0:
-		var progress := 1.0 - _special_motion_left / _special_motion_duration
-		var aim := _aim.normalized() if _aim.length() > 0.01 else Vector2.RIGHT
-		if _who == Balance.CHAR_MASSA:
-			for i in 3:
-				var angle := _anim * 18.0 + float(i) * TAU / 3.0
-				var radius := 86.0 + float(i) * 28.0 + progress * 116.0
-				draw_arc(sim.player_pos, radius, angle, angle + PI * 0.82, 48, Color(1.0, 0.78 + float(i) * 0.06, 0.35, 0.9 - progress * 0.42), 13.0 - float(i) * 2.0, true)
-		elif _who == Balance.CHAR_TAKETCHI:
-			var radius := 48.0 + progress * 260.0
-			draw_arc(sim.player_pos, radius, -0.25, TAU * 0.78, 72, Color(1.0, 0.72, 0.2, 0.8 * (1.0 - progress * 0.4)), 12.0, true)
-			for i in 4:
-				var offset := (float(i) - 1.5) * 15.0
-				var side := aim.orthogonal() * offset
-				draw_line(sim.player_pos + side + aim * 30.0, sim.player_pos + side + aim * (130.0 + progress * 180.0), Color(1.0, 0.91, 0.62, 0.75), 7.0 - float(i), true)
-		else:
-			var beat := _anim * 42.0
-			for i in 6:
-				var angle := beat * 0.62 + float(i) * TAU / 6.0
-				var direction := aim.rotated(angle) * (55.0 + fposmod(float(i) * 37.0, 72.0))
-				draw_line(sim.player_pos + direction, sim.player_pos + direction + direction.normalized() * 76.0, Color(0.55, 0.9, 1.0, 0.8), 5.0, true)
-	if _who == Balance.CHAR_TAKETCHI and sim.special_active_left > 0.0:
-		var pulse := 0.5 + 0.5 * sin(_anim * 12.0)
-		draw_arc(sim.player_pos, 54.0 + pulse * 10.0, 0.0, TAU, 56, Color(1.0, 0.72, 0.2, 0.48 + pulse * 0.2), 5.0, true)
-		for i in 8:
-			var angle := float(i) * TAU / 8.0 + _anim * 0.8
-			var direction := Vector2.from_angle(angle)
-			draw_line(sim.player_pos + direction * 66.0, sim.player_pos + direction * (78.0 + pulse * 12.0), Color(1.0, 0.9, 0.56, 0.62), 3.0, true)
-	if _who == Balance.CHAR_KENNY and sim.special_active_left > 0.0:
-		var tex: Texture2D = _frames["hit"]
-		for i in range(5, 0, -1):
-			var alpha := 0.3 - float(i) * 0.045
-			var pose := {
-				"hop": 0.0,
-				"rot": 0.0,
-				"sx": _player_face,
-				"sy": 1.0,
-				"tint": Color(0.44, 0.86, 1.0, alpha),
-				"lunge": -_aim.normalized() * float(i) * 32.0 + Vector2(0.0, sin(_anim * 24.0 - float(i)) * 10.0),
-				"flash": 0.0,
-			}
-			_draw_posed(tex, sim.player_pos + Vector2(0, -4), _sprite_h(), 480.0, pose)
+func _aim_dir() -> Vector2:
+	if _aim.length() > 0.01:
+		return _aim.normalized()
+	var facing := Vector2(_player_face, 0.0)
+	if facing.length() < 0.01:
+		return Vector2.RIGHT
+	return facing.normalized()
 
 
-func _draw_special_flames() -> void:
-	var motion := _special_phase == "motion" and _special_motion_left > 0.0
-	var lasting: bool = float(sim.special_active_left) > 0.0 or _special_ring_left > 0.0
+func _special_motion() -> bool:
+	return _special_phase == "motion" and _special_motion_left > 0.0 and _special_motion_duration > 0.0
+
+
+func _special_progress() -> float:
+	if _special_motion_duration <= 0.0:
+		return 0.0
+	return clampf(1.0 - _special_motion_left / _special_motion_duration, 0.0, 1.0)
+
+
+func _draw_special_back() -> void:
+	if _who == Balance.CHAR_MASSA:
+		_draw_massa_back()
+	elif _who == Balance.CHAR_TAKETCHI:
+		_draw_taketchi_back()
+	else:
+		_draw_kenny_back()
+
+
+func _draw_special_front() -> void:
+	if _who == Balance.CHAR_MASSA:
+		_draw_massa_front()
+	elif _who == Balance.CHAR_TAKETCHI:
+		_draw_taketchi_front()
+	else:
+		_draw_kenny_front()
+
+
+func _draw_massa_back() -> void:
+	if _special_ring_left <= 0.0:
+		return
+	var progress := clampf(1.0 - _special_ring_left / Balance.SPECIAL_MASSA_MOTION_SECONDS, 0.0, 1.0)
+	var radius := lerpf(64.0, Balance.SPECIAL_MASSA_RADIUS, progress)
+	var fade := 1.0 - progress * 0.35
+	var origin := Vector2(sim.player_pos)
+	draw_set_transform(origin, 0.0, Vector2(1.0, 0.38))
+	draw_circle(Vector2.ZERO, radius, Color(1.0, 0.62, 0.12, 0.16 * fade))
+	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 72, Color(1.0, 0.82, 0.28, 0.55 * fade), 16.0, true)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var spin := -PI * 0.5 + progress * TAU
+	draw_arc(origin, radius, spin, spin + TAU * 0.92, 96, Color(1.0, 0.86, 0.32, 0.95 * fade), 18.0, true)
+	draw_arc(origin, maxf(24.0, radius - 28.0), spin + 0.8, spin + PI * 1.3, 64, Color(1.0, 0.98, 0.82, 0.75 * fade), 6.0, true)
+	for i in 10:
+		var ang := spin + float(i) * TAU / 10.0
+		var dir := Vector2.from_angle(ang)
+		draw_line(origin + dir * (radius - 10.0), origin + dir * (radius + 26.0), Color(1.0, 0.95, 0.7, 0.7 * fade), 3.0, true)
+
+
+func _draw_massa_front() -> void:
+	if not _special_motion():
+		return
+	var progress := _special_progress()
+	var origin := Vector2(sim.player_pos) + Vector2(0.0, -48.0)
+	var spin := progress * TAU * 2.0 - PI * 0.35
+	var reach := lerpf(110.0, 250.0, sin(progress * PI))
+	var hand := origin + Vector2.from_angle(spin) * 36.0
+	var tip := origin + Vector2.from_angle(spin) * reach
+	draw_line(hand, tip, Color(0.28, 0.24, 0.2, 0.95), 18.0, true)
+	draw_line(hand, tip, Color(0.9, 0.92, 0.94, 0.95), 8.0, true)
+	draw_circle(tip, 12.0, Color(1.0, 0.9, 0.48, 0.95))
+	for i in 3:
+		var ang := spin - float(i) * 0.55
+		var arc_r := reach * (0.78 - float(i) * 0.14)
+		draw_arc(origin, arc_r, ang - 0.1, ang + 1.2, 24, Color(1.0, 0.74 - float(i) * 0.08, 0.2, 0.86 - float(i) * 0.16), 13.0 - float(i) * 3.0, true)
+
+
+func _draw_taketchi_back() -> void:
+	var lasting: bool = float(sim.special_active_left) > 0.0
+	if not lasting and not _special_motion():
+		return
+	var origin := Vector2(sim.player_pos)
+	var pulse := 0.5 + 0.5 * sin(_anim * 14.0)
+	draw_circle(origin + Vector2(0.0, -20.0), 52.0 + pulse * 20.0, Color(1.0, 0.26, 0.05, 0.18 + pulse * 0.08))
+	if not lasting:
+		return
+	draw_arc(origin, 60.0 + pulse * 16.0, 0.0, TAU, 48, Color(1.0, 0.42, 0.1, 0.75), 7.0, true)
+	for i in 6:
+		var ang := _anim * 3.4 + float(i) * TAU / 6.0
+		var spot := origin + Vector2.from_angle(ang) * (48.0 + pulse * 14.0) + Vector2(0.0, -18.0)
+		draw_circle(spot, 7.0, Color(1.0, 0.72, 0.24, 0.92))
+		draw_circle(spot + Vector2(-2.0, -2.0), 2.6, Color(1.0, 0.97, 0.86, 0.95))
+
+
+func _draw_taketchi_front() -> void:
+	var aim := _aim_dir()
+	var origin := Vector2(sim.player_pos) + Vector2(0.0, -28.0)
+	if _special_motion():
+		var strike := sin(_special_progress() * PI)
+		var impact := origin + aim * (36.0 + strike * 176.0)
+		draw_line(origin, impact, Color(1.0, 0.48, 0.08, 0.9), 10.0 + strike * 16.0, true)
+		draw_circle(impact, 18.0 + strike * 56.0, Color(1.0, 0.84, 0.4, 0.3 * strike))
+		var side := aim.orthogonal()
+		draw_line(impact - side * (28.0 + strike * 78.0), impact + side * (28.0 + strike * 78.0), Color(1.0, 0.96, 0.82, 0.92 * strike), 8.0, true)
+		for i in 4:
+			var radius := 24.0 + float(i) * 28.0 * maxf(strike, 0.2)
+			draw_arc(impact, radius, aim.angle() - 1.25, aim.angle() + 1.25, 22, Color(1.0, 0.46 - float(i) * 0.06, 0.08, 0.92 - float(i) * 0.15), 12.0 - float(i) * 2.0, true)
+		return
+	if float(sim.special_active_left) <= 0.0 or _strike_age >= 0.16:
+		return
+	var power := 1.0 - _strike_age / 0.16
+	var impact := origin + aim * 90.0
+	draw_line(origin + aim * 20.0, impact, Color(1.0, 0.62, 0.22, power), 7.0, true)
+	draw_arc(impact, 22.0 + (1.0 - power) * 40.0, aim.angle() - 1.15, aim.angle() + 1.15, 18, Color(1.0, 0.88, 0.5, power), 8.0, true)
+
+
+func _draw_kenny_back() -> void:
+	var motion := _special_motion()
+	var lasting: bool = float(sim.special_active_left) > 0.0
 	if not motion and not lasting:
 		return
-	var strength := 1.15 if motion else 0.78
-	var origin: Vector2 = Vector2(sim.player_pos) + Vector2(0.0, -18.0)
-	var base_r := 36.0 if _who == Balance.CHAR_KENNY else 44.0
-	draw_circle(origin, base_r + 16.0 * strength, Color(1.0, 0.38, 0.06, 0.14 * strength))
-	for i in 10:
-		var spin := _anim * (1.35 if motion else 0.7)
-		var angle := float(i) / 10.0 * TAU + spin
-		var wobble := sin(_anim * 11.0 + float(i) * 1.9) * 0.42
-		var flicker := 0.45 + 0.55 * absf(sin(_anim * 17.0 + float(i) * 2.4))
-		var dir := Vector2.from_angle(angle + wobble)
-		var inner := base_r * (0.5 + 0.2 * sin(_anim * 8.0 + float(i)))
-		var tongue := (18.0 + flicker * 40.0) * strength
-		var root: Vector2 = origin + dir * inner
-		var tip: Vector2 = origin + dir * (inner + tongue) + Vector2(sin(_anim * 13.0 + float(i)) * 7.0, -flicker * 10.0)
-		var side := dir.orthogonal() * (5.0 + flicker * 5.5)
-		draw_colored_polygon(PackedVector2Array([root + side, root - side, tip]), Color(1.0, 0.3 + flicker * 0.32, 0.05, 0.26 + flicker * 0.5))
-		draw_colored_polygon(PackedVector2Array([
-			root + side * 0.36,
-			root - side * 0.36,
-			root + dir * (tongue * 0.42) + Vector2(0.0, -4.0),
-		]), Color(1.0, 0.92, 0.6, 0.32 + flicker * 0.42))
+	var origin := Vector2(sim.player_pos)
+	var aim := _aim_dir()
+	var back := -aim
+	var side := aim.orthogonal()
+	var tex: Texture2D = _frames["hit"] if _frames.has("hit") else null
+	var ghosts := 6 if motion else 4
+	for i in range(ghosts, 0, -1):
+		var alpha := (0.36 if motion else 0.28) - float(i) * 0.045
+		var pose := {
+			"hop": 0.0,
+			"rot": sin(_anim * 18.0 - float(i)) * 0.1,
+			"sx": _player_face,
+			"sy": 1.0,
+			"tint": Color(0.5, 0.92, 1.0, maxf(alpha, 0.0)),
+			"lunge": back * float(i) * (30.0 if motion else 22.0) + Vector2(0.0, sin(_anim * 22.0 - float(i)) * 8.0),
+			"flash": 0.0,
+		}
+		_draw_posed(tex, origin + Vector2(0.0, -4.0), _sprite_h(), 480.0, pose)
+	var lines := 8 if motion else 5
+	var reach := 170.0 if motion else 96.0
+	for i in lines:
+		var offset := (float(i) - float(lines - 1) * 0.5) * 16.0
+		var start := origin + back * 18.0 + side * offset + Vector2(0.0, -22.0)
+		var tail := reach + sin(_anim * 20.0 + float(i)) * 26.0
+		draw_line(start, start + back * tail, Color(0.72, 0.96, 1.0, 0.32 if motion else 0.16), 3.0, true)
+	if not motion:
+		return
+	var progress := _special_progress()
+	for i in 5:
+		var ang := float(i) / 5.0 * TAU + _anim * 4.0
+		var spot := origin + Vector2.from_angle(ang) * (52.0 + progress * 100.0) + Vector2(0.0, -30.0)
+		_draw_yen_glint(spot, 11.0, Color(1.0, 0.86, 0.28, 0.95 * (1.0 - progress * 0.25)))
+
+
+func _draw_kenny_front() -> void:
+	var aim := _aim_dir()
+	var origin := Vector2(sim.player_pos) + Vector2(0.0, -32.0)
+	if _special_motion():
+		var progress := _special_progress()
+		for i in 4:
+			var sweep := progress * TAU + float(i) * 0.9
+			var center := origin + aim.rotated(sin(sweep) * 0.5) * (28.0 + float(i) * 24.0)
+			draw_arc(center, 42.0 + float(i) * 18.0, aim.angle() + sweep * 0.15 - 1.05, aim.angle() + sweep * 0.15 + 0.9, 16, Color(0.62, 0.96, 1.0, 0.9 - float(i) * 0.14), 8.0 - float(i), true)
+		return
+	if float(sim.special_active_left) <= 0.0 or _strike_age >= 0.12:
+		return
+	var power := 1.0 - _strike_age / 0.12
+	var center := origin + aim * 58.0
+	draw_arc(center, 36.0 + (1.0 - power) * 22.0, aim.angle() - 0.95, aim.angle() + 1.0, 16, Color(0.78, 0.98, 1.0, power), 6.0, true)
+
+
+func _draw_yen_glint(spot: Vector2, radius: float, color: Color) -> void:
+	draw_circle(spot, radius + 2.0, Color(0.45, 0.28, 0.05, color.a))
+	draw_circle(spot, radius, color)
+	draw_circle(spot + Vector2(-radius * 0.28, -radius * 0.3), radius * 0.32, Color(1.0, 0.97, 0.82, color.a))
+	draw_line(spot + Vector2(-radius * 0.35, radius * 0.08), spot + Vector2(radius * 0.35, radius * 0.08), Color(0.55, 0.32, 0.05, color.a), 1.5, true)
 
 
 func _enemy_pose(actor) -> Dictionary:
@@ -1092,45 +1202,46 @@ func _build_special_cut_in() -> void:
 	UiFont.full_rect(_special_cut_in)
 	layer.add_child(_special_cut_in)
 
-	_special_margin = MarginContainer.new()
-	_special_cut_in.add_child(_special_margin)
-	_fill(_special_margin)
-	_special_margin.add_theme_constant_override("margin_left", 24)
-	_special_margin.add_theme_constant_override("margin_right", 24)
+	_special_dim = ColorRect.new()
+	_special_dim.color = Color(0.01, 0.0, 0.02, 0.72)
+	_special_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(_special_dim)
+	_special_cut_in.add_child(_special_dim)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0.02, 0.02, 0.03, 0.42)
-	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(dim)
-	_special_cut_in.add_child(dim)
+	_special_wash = ColorRect.new()
+	_special_wash.color = Color(1.0, 0.72, 0.2, 0.18)
+	_special_wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(_special_wash)
+	_special_cut_in.add_child(_special_wash)
 
-	var band := PanelContainer.new()
-	band.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	band.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var band_style := UiFont.style(Color("17130f"), Color("e6bd62"), 5, 4)
-	band_style.content_margin_top = 24
-	band_style.content_margin_bottom = 24
-	band_style.content_margin_left = 24
-	band_style.content_margin_right = 24
-	band.add_theme_stylebox_override("panel", band_style)
-	_special_margin.add_child(band)
+	for i in 14:
+		var line := ColorRect.new()
+		line.color = Color(1.0, 0.86, 0.42, 0.22)
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.size = Vector2(14.0 if i % 3 == 0 else 6.0, 1700.0)
+		line.position = Vector2(-360.0 + float(i) * 92.0, -260.0)
+		line.rotation = -0.62
+		_special_cut_in.add_child(line)
+		_special_streaks.append(line)
 
-	var flash_layer := CanvasLayer.new()
-	flash_layer.layer = 17
-	add_child(flash_layer)
-	_special_flash = ColorRect.new()
-	_special_flash.color = Color.WHITE
-	_special_flash.modulate.a = 0.0
-	_special_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiFont.full_rect(_special_flash)
-	flash_layer.add_child(_special_flash)
+	_special_band = PanelContainer.new()
+	_special_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_special_band.anchor_left = 0.0
+	_special_band.anchor_right = 1.0
+	_special_band.anchor_top = 0.5
+	_special_band.anchor_bottom = 0.5
+	_special_band.offset_top = -124.0
+	_special_band.offset_bottom = 124.0
+	_special_band.offset_left = 0.0
+	_special_band.offset_right = 0.0
+	_special_cut_in.add_child(_special_band)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 24)
+	row.add_theme_constant_override("separation", 18)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	band.add_child(row)
+	_special_band.add_child(row)
 	_special_face = TextureRect.new()
-	_special_face.custom_minimum_size = Vector2(172, 0)
+	_special_face.custom_minimum_size = Vector2(148, 188)
 	_special_face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_special_face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_special_face.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1140,33 +1251,134 @@ func _build_special_cut_in() -> void:
 	copy.add_theme_constant_override("separation", 8)
 	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(copy)
-	_special_name = UiFont.label("", 28, UiFont.BRASS)
+	_special_name = UiFont.label("", 22, UiFont.BRASS)
+	_special_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_special_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_special_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(_special_name)
-	_special_quote = UiFont.label("", 34, UiFont.PAPER)
+	_special_quote = UiFont.label("", 36, UiFont.PAPER)
+	_special_quote.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_special_quote.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_special_quote.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_special_quote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_special_quote.add_theme_font_override("font", load(SPECIAL_FONT))
+	_special_quote.add_theme_font_size_override("font_size", 34)
+	_special_quote.add_theme_constant_override("outline_size", 8)
 	_special_quote.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(_special_quote)
+
+	var flash_layer := CanvasLayer.new()
+	flash_layer.layer = 18
+	add_child(flash_layer)
+	_special_flash = ColorRect.new()
+	_special_flash.color = Color.WHITE
+	_special_flash.modulate.a = 0.0
+	_special_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(_special_flash)
+	flash_layer.add_child(_special_flash)
+
+
+func _special_line() -> String:
+	if _who == Balance.CHAR_TAKETCHI:
+		return "こいつら蹴散らしたら、\n銭湯行かね？"
+	if _who == Balance.CHAR_KENNY:
+		return "私の勝利に、\n100ｲｪﾝ賭けます。"
+	return str(Balance.SPECIAL_QUOTES[_who])
+
+
+func _special_palette() -> Dictionary:
+	if _who == Balance.CHAR_TAKETCHI:
+		return {
+			"edge": Color("ff7a32"),
+			"fill": Color(0.28, 0.06, 0.02, 0.94),
+			"flash": Color("ffd0a0"),
+			"wash": Color(1.0, 0.32, 0.08, 0.22),
+			"streak": Color(1.0, 0.55, 0.18, 0.28),
+			"quote": Color("fff4ea"),
+		}
+	if _who == Balance.CHAR_KENNY:
+		return {
+			"edge": Color("7adfff"),
+			"fill": Color(0.02, 0.08, 0.16, 0.94),
+			"flash": Color("e7f9ff"),
+			"wash": Color(0.25, 0.75, 1.0, 0.2),
+			"streak": Color(0.62, 0.92, 1.0, 0.3),
+			"quote": Color("f4fbff"),
+		}
+	return {
+		"edge": Color("f0c14a"),
+		"fill": Color(0.18, 0.09, 0.02, 0.94),
+		"flash": Color("fff3c4"),
+		"wash": Color(1.0, 0.72, 0.16, 0.2),
+		"streak": Color(1.0, 0.84, 0.36, 0.28),
+		"quote": Color("fff8e6"),
+	}
+
+
+func _apply_cut_in_style(palette: Dictionary) -> void:
+	var box := StyleBoxFlat.new()
+	box.bg_color = palette.fill
+	box.border_color = palette.edge
+	box.border_width_top = 8
+	box.border_width_bottom = 8
+	box.border_width_left = 0
+	box.border_width_right = 0
+	box.content_margin_left = 20
+	box.content_margin_right = 28
+	box.content_margin_top = 16
+	box.content_margin_bottom = 16
+	_special_band.add_theme_stylebox_override("panel", box)
+	_special_wash.color = palette.wash
+	_special_name.add_theme_color_override("font_color", palette.edge)
+	_special_quote.add_theme_color_override("font_color", palette.quote)
+	for line in _special_streaks:
+		line.color = palette.streak
+
+
+func _slide_special_streaks(dt: float) -> void:
+	for i in _special_streaks.size():
+		var line := _special_streaks[i]
+		var speed := 540.0 if i % 2 == 0 else -470.0
+		line.position.x += speed * dt
+		if line.position.x > 980.0:
+			line.position.x = -460.0
+		elif line.position.x < -560.0:
+			line.position.x = 860.0
 
 
 func _activate_special() -> void:
 	if sim == null or not sim.begin_special():
 		return
+	var palette := _special_palette()
+	_apply_cut_in_style(palette)
 	_special_phase = "intro"
 	_special_face.texture = _face_texture()
-	_special_name.text = "%s  必殺技" % _who
-	_special_quote.text = str(Balance.SPECIAL_QUOTES[_who])
+	_special_name.text = "%s    %s" % [_who, str(SPECIAL_TITLES[_who])]
+	_special_quote.text = _special_line()
 	_special_cut_in.visible = true
-	_special_cut_in.modulate.a = 0.0
-	_special_cut_in.scale = Vector2(0.94, 0.94)
-	_special_cut_in.pivot_offset = get_viewport_rect().size * 0.5
+	_special_cut_in.modulate.a = 1.0
+	_special_dim.modulate.a = 0.0
+	_special_wash.modulate.a = 0.0
+	var vp := get_viewport_rect().size
+	_special_band.pivot_offset = Vector2(vp.x * 0.5, 124.0)
+	_special_band.scale = Vector2(1.0, 0.06)
+	_special_band.modulate.a = 1.0
+	for line in _special_streaks:
+		line.modulate.a = 0.0
+	_punch_flash(Color.WHITE, 0.92, 0.16)
+	_shake_left = 0.32
 	if _special_tween != null and _special_tween.is_running():
 		_special_tween.kill()
 	_special_tween = create_tween()
-	_special_tween.tween_property(_special_cut_in, "modulate:a", 1.0, 0.14)
-	_special_tween.parallel().tween_property(_special_cut_in, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_special_tween.tween_interval(0.48)
-	_special_tween.tween_property(_special_cut_in, "modulate:a", 0.0, 0.2)
+	_special_tween.tween_property(_special_dim, "modulate:a", 1.0, 0.08)
+	_special_tween.parallel().tween_property(_special_wash, "modulate:a", 1.0, 0.1)
+	_special_tween.parallel().tween_property(_special_band, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	for line in _special_streaks:
+		_special_tween.parallel().tween_property(line, "modulate:a", 1.0, 0.12)
+	_special_tween.tween_interval(0.78)
+	_special_tween.tween_property(_special_band, "scale", Vector2(1.0, 0.04), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_special_tween.parallel().tween_property(_special_dim, "modulate:a", 0.0, 0.16)
+	_special_tween.parallel().tween_property(_special_wash, "modulate:a", 0.0, 0.16)
 	_special_tween.tween_callback(func() -> void: _special_cut_in.visible = false)
 	_special_tween.tween_callback(_resolve_special)
 	_update_special_hud()
@@ -1180,40 +1392,44 @@ func _resolve_special() -> void:
 	_special_phase = "motion"
 	_special_motion_duration = motion_duration
 	_special_motion_left = motion_duration
-	var primary := Color("f4c45a")
+	var palette := _special_palette()
+	var primary: Color = palette.flash
+	var aim := _aim_dir()
 	if _who == Balance.CHAR_MASSA:
 		_special_ring_left = motion_duration
-		_shake_left = 0.46
-		_special_burst(Color("fff0a8"), Color("f08a36"), 48, 160.0, 520.0)
+		_shake_left = 0.5
+		_special_burst(Color("fff6c8"), Color("f08a28"), 56, 180.0, 560.0, Vector2.ZERO)
 	elif _who == Balance.CHAR_TAKETCHI:
-		primary = Color("ffd15a")
-		_shake_left = 0.34
-		_special_burst(Color("fff1a8"), Color("e77a32"), 36, 90.0, 360.0)
+		_shake_left = 0.42
+		_special_burst(Color("fff1c2"), Color("e85a18"), 40, 80.0, 340.0, aim * 320.0)
 	else:
-		primary = Color("68dcff")
-		_shake_left = 0.18
-		_special_burst(Color("e4faff"), Color("58cfff"), 42, 120.0, 460.0)
-	_special_flash.color = primary
-	_special_flash.modulate.a = 0.42
-	if _special_flash_tween != null and _special_flash_tween.is_running():
-		_special_flash_tween.kill()
-	_special_flash_tween = create_tween()
-	_special_flash_tween.tween_property(_special_flash, "modulate:a", 0.0, 0.18)
+		_shake_left = 0.24
+		_special_burst(Color("f4fcff"), Color("3ec8ff"), 48, 140.0, 520.0, aim * 180.0)
+	_punch_flash(primary, 0.72, 0.24)
 	_update_special_hud()
 	queue_redraw()
 
 
-func _special_burst(near_color: Color, far_color: Color, count: int, min_speed: float, max_speed: float) -> void:
+func _punch_flash(color: Color, alpha: float, seconds: float) -> void:
+	_special_flash.color = color
+	_special_flash.modulate.a = alpha
+	if _special_flash_tween != null and _special_flash_tween.is_running():
+		_special_flash_tween.kill()
+	_special_flash_tween = create_tween()
+	_special_flash_tween.tween_property(_special_flash, "modulate:a", 0.0, seconds)
+
+
+func _special_burst(near_color: Color, far_color: Color, count: int, min_speed: float, max_speed: float, bias: Vector2 = Vector2.ZERO) -> void:
 	for i in count:
 		var angle := float(i) / float(count) * TAU + randf_range(-0.08, 0.08)
-		var life := randf_range(0.34, 0.72)
+		var life := randf_range(0.38, 0.78)
 		_puffs.append({
 			"pos": sim.player_pos + Vector2(0.0, -28.0),
-			"vel": Vector2.from_angle(angle) * randf_range(min_speed, max_speed),
+			"vel": Vector2.from_angle(angle) * randf_range(min_speed, max_speed) + bias * randf_range(0.35, 1.0),
 			"life": life,
 			"max": life,
 			"color": near_color.lerp(far_color, randf()),
-			"size": randf_range(4.0, 10.0),
+			"size": randf_range(5.0, 12.0),
 		})
 
 
@@ -1265,7 +1481,9 @@ func _update_special_hud() -> void:
 	var percent := int(roundf(sim.special_charge))
 	var active: bool = float(sim.special_active_left) > 0.0
 	var ready: bool = sim.can_activate_special()
-	if active:
+	if _special_phase == "intro" or _special_phase == "motion":
+		special_button.text = "発動"
+	elif active:
 		special_button.text = "%.1f\n秒" % sim.special_active_left
 	elif ready:
 		special_button.text = "発動"
@@ -1304,7 +1522,7 @@ func _build_boss_hud() -> void:
 
 	var main_col := VBoxContainer.new()
 	main_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	main_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	main_col.alignment = BoxContainer.ALIGNMENT_BEGIN
 	main_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_boss_margin.add_child(main_col)
@@ -1337,23 +1555,25 @@ func _build_boss_hud() -> void:
 	_boss_hp.add_theme_stylebox_override("fill", UiFont.style(Color("e34c39"), Color("ffb55a"), 1, 3))
 	boss_col.add_child(_boss_hp)
 
-	# Spacer
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_col.add_child(spacer)
+	_boss_dim = ColorRect.new()
+	_boss_dim.color = Color(0.01, 0.0, 0.03, 0.55)
+	_boss_dim.visible = false
+	_boss_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiFont.full_rect(_boss_dim)
+	root.add_child(_boss_dim)
 
-	# Boss banner at center
 	_boss_banner = PanelContainer.new()
 	_boss_banner.visible = false
 	_boss_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_boss_banner.pivot_offset = Vector2(640, 180)
-	var banner_style := UiFont.style(Color("15120f"), Color("e0a448"), 5, 6)
-	banner_style.content_margin_top = 24
-	banner_style.content_margin_bottom = 24
-	banner_style.content_margin_left = 24
-	banner_style.content_margin_right = 24
-	_boss_banner.add_theme_stylebox_override("panel", banner_style)
-	main_col.add_child(_boss_banner)
+	_boss_banner.anchor_left = 0.0
+	_boss_banner.anchor_right = 1.0
+	_boss_banner.anchor_top = 0.5
+	_boss_banner.anchor_bottom = 0.5
+	_boss_banner.offset_left = 0.0
+	_boss_banner.offset_right = 0.0
+	_boss_banner.offset_top = -96.0
+	_boss_banner.offset_bottom = 96.0
+	root.add_child(_boss_banner)
 
 	var banner_row := HBoxContainer.new()
 	banner_row.add_theme_constant_override("separation", 20)
@@ -1370,9 +1590,15 @@ func _build_boss_hud() -> void:
 	banner_copy.add_theme_constant_override("separation", 8)
 	banner_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	banner_row.add_child(banner_copy)
-	_boss_banner_name = UiFont.label("", 34, UiFont.PAPER)
+	_boss_banner_name = UiFont.label("", 36, UiFont.PAPER)
+	_boss_banner_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_boss_banner_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_boss_banner_name.add_theme_font_override("font", load(SPECIAL_FONT))
+	_boss_banner_name.add_theme_font_size_override("font_size", 36)
 	banner_copy.add_child(_boss_banner_name)
 	_boss_banner_action = UiFont.label("", 22, UiFont.BRASS)
+	_boss_banner_action.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_boss_banner_action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_boss_banner_action.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	banner_copy.add_child(_boss_banner_action)
 
@@ -1401,18 +1627,36 @@ func _show_boss_banner(kind: String) -> void:
 		edge = Color("a9eb4b")
 	elif kind == Balance.KIND_TEACHER:
 		edge = Color("e7d7a2")
-	_boss_banner.add_theme_stylebox_override("panel", UiFont.style(Color("15120f"), edge, 5, 6))
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.07, 0.05, 0.04, 0.94)
+	box.border_color = edge
+	box.border_width_top = 8
+	box.border_width_bottom = 8
+	box.content_margin_left = 20
+	box.content_margin_right = 24
+	box.content_margin_top = 14
+	box.content_margin_bottom = 14
+	_boss_banner.add_theme_stylebox_override("panel", box)
+	_boss_banner_name.add_theme_color_override("font_color", edge)
+	var vp := get_viewport_rect().size
+	_boss_banner.pivot_offset = Vector2(vp.x * 0.5, 96.0)
 	_boss_banner.visible = true
-	_boss_banner.modulate.a = 0.0
-	_boss_banner.scale = Vector2(0.88, 0.88)
+	_boss_dim.visible = true
+	_boss_banner.modulate.a = 1.0
+	_boss_banner.scale = Vector2(1.0, 0.06)
+	_boss_dim.modulate.a = 0.0
 	if _boss_banner_tween != null and _boss_banner_tween.is_running():
 		_boss_banner_tween.kill()
 	_boss_banner_tween = create_tween()
-	_boss_banner_tween.tween_property(_boss_banner, "modulate:a", 1.0, 0.16)
-	_boss_banner_tween.parallel().tween_property(_boss_banner, "scale", Vector2.ONE, 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_boss_banner_tween.tween_interval(1.8)
-	_boss_banner_tween.tween_property(_boss_banner, "modulate:a", 0.0, 0.25)
-	_boss_banner_tween.tween_callback(func() -> void: _boss_banner.visible = false)
+	_boss_banner_tween.tween_property(_boss_dim, "modulate:a", 1.0, 0.1)
+	_boss_banner_tween.parallel().tween_property(_boss_banner, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_boss_banner_tween.tween_interval(1.7)
+	_boss_banner_tween.tween_property(_boss_banner, "scale", Vector2(1.0, 0.04), 0.16)
+	_boss_banner_tween.parallel().tween_property(_boss_dim, "modulate:a", 0.0, 0.18)
+	_boss_banner_tween.tween_callback(func() -> void:
+		_boss_banner.visible = false
+		_boss_dim.visible = false
+	)
 
 
 func _intrusion_portrait(kind: String) -> Texture2D:
