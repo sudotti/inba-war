@@ -303,15 +303,30 @@ func _note_fx(dt: float) -> void:
 		if absf(delta.x) > 0.4:
 			_face[key] = -1.0 if delta.x < 0.0 else 1.0
 		var state := str(actor.attack_state)
-		if str(_last_state.get(key, "")) != state:
+		var prev_state := str(_last_state.get(key, ""))
+		if prev_state != state:
 			_last_state[key] = state
 			if state.ends_with("_windup"):
-				_flash[key] = 0.16
-				_spawn_puff(Vector2(actor.pos) + Vector2(0.0, -50.0), Color(1.0, 0.85, 0.3, 0.8))
-		if actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_dash" and randf() < 0.3:
+				_flash[key] = 0.22
+				_ring_burst(Vector2(actor.pos) + Vector2(0.0, -46.0), Color(1.0, 0.88, 0.4, 0.9), 8, 50.0, 150.0, 0.32)
+			if prev_state == "empower_windup":
+				_ring_burst(Vector2(actor.pos), Color(0.72, 1.0, 0.32, 0.95), 18, 90.0, 280.0, 0.5)
+				_shake_left = maxf(_shake_left, 0.18)
+			elif prev_state == "poison_windup":
+				_ring_burst(Vector2(actor.pos) + Vector2(0.0, -36.0), Color(0.5, 1.0, 0.16, 0.95), 14, 70.0, 230.0, 0.42)
+				_shake_left = maxf(_shake_left, 0.14)
+			elif prev_state == "volley_windup":
+				_ring_burst(Vector2(actor.pos) + Vector2(0.0, -78.0), Color(1.0, 0.82, 0.35, 0.95), 12, 80.0, 240.0, 0.38)
+				_shake_left = maxf(_shake_left, 0.16)
+			elif state == "kick_dash":
+				_ring_burst(Vector2(actor.pos), Color(1.0, 0.42, 0.18, 0.95), 16, 100.0, 300.0, 0.4)
+				_shake_left = maxf(_shake_left, 0.24)
+		if actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_dash":
 			var dash: Vector2 = actor.target_pos - actor.pos
 			if dash.length() > 0.01:
-				_spawn_puff(actor.pos - dash.normalized() * 30.0, Color(1.0, 0.7, 0.4, 0.5))
+				_spawn_puff(actor.pos - dash.normalized() * 36.0, Color(1.0, 0.55, 0.22, 0.7))
+				if randf() < 0.55:
+					_spawn_puff(actor.pos - dash.normalized() * 18.0 + Vector2(randf_range(-16.0, 16.0), randf_range(-10.0, 10.0)), Color(1.0, 0.92, 0.7, 0.55))
 		_watch[key] = {"hp": actor.hp, "pos": actor.pos, "kind": actor.kind}
 	if just_hit:
 		_seen_attack = sim.attack_serial
@@ -370,53 +385,90 @@ func _spawn_puff(pos: Vector2, color: Color) -> void:
 	})
 
 
+func _ring_burst(spot: Vector2, color: Color, count: int, speed_min: float, speed_max: float, life: float) -> void:
+	for i in count:
+		var ang := float(i) / float(count) * TAU + randf_range(-0.18, 0.18)
+		_puffs.append({
+			"pos": spot,
+			"vel": Vector2.from_angle(ang) * randf_range(speed_min, speed_max),
+			"life": life,
+			"max": life,
+			"color": color,
+			"size": randf_range(8.0, 18.0),
+		})
+
+
 func _draw_boss_telegraphs() -> void:
 	for pool in sim.poison_pools:
 		var fade := clampf(float(pool.life) / 0.8, 0.0, 1.0)
 		var pulse := 0.8 + 0.2 * sin(_anim * 8.0)
-		draw_circle(pool.pos, float(pool.radius), Color(0.37, 0.9, 0.12, 0.18 * fade))
-		draw_arc(pool.pos, float(pool.radius) * pulse, 0.0, TAU, 48, Color(0.68, 1.0, 0.22, 0.72 * fade), 6.0, true)
+		draw_circle(pool.pos, float(pool.radius), Color(0.37, 0.9, 0.12, 0.22 * fade))
+		draw_circle(pool.pos, float(pool.radius) * 0.55, Color(0.7, 1.0, 0.25, 0.16 * fade))
+		draw_arc(pool.pos, float(pool.radius) * pulse, 0.0, TAU, 48, Color(0.68, 1.0, 0.22, 0.85 * fade), 7.0, true)
+		draw_arc(pool.pos, float(pool.radius) * 0.62, _anim * 1.4, _anim * 1.4 + TAU * 0.55, 24, Color(0.9, 1.0, 0.45, 0.7 * fade), 4.0, true)
+		for i in 5:
+			var bubble := Vector2(pool.pos) + Vector2.from_angle(_anim * 1.6 + float(i) * TAU / 5.0) * float(pool.radius) * (0.35 + 0.4 * absf(sin(_anim * 3.0 + float(i))))
+			draw_circle(bubble, 4.0 + float(i % 2) * 2.0, Color(0.85, 1.0, 0.45, 0.55 * fade))
 	for projectile in sim.boss_projectiles:
 		if projectile.kind == Balance.BOSS_VOLLEY:
 			var flight := maxf(float(projectile.flight_seconds), 0.01)
 			var progress := clampf(float(projectile.age) / flight, 0.0, 1.0)
-			var height := sin(progress * PI) * 112.0
+			var height := sin(progress * PI) * 140.0
 			var spot: Vector2 = projectile.pos + Vector2(0.0, -height)
+			var travel := Vector2(projectile.velocity)
+			if travel.length() > 1.0:
+				var back := travel.normalized()
+				draw_line(spot, spot - back * 78.0 + Vector2(0.0, 18.0), Color(1.0, 0.86, 0.45, 0.45), 10.0, true)
+				draw_circle(spot - back * 36.0, float(projectile.radius) * 0.7, Color(1.0, 0.75, 0.3, 0.28))
 			draw_set_transform(projectile.pos + Vector2(0.0, 8.0), 0.0, Vector2(1.0, 0.32))
-			draw_circle(Vector2.ZERO, float(projectile.radius) * 1.25, Color(0.0, 0.0, 0.0, 0.3))
+			draw_circle(Vector2.ZERO, float(projectile.radius) * 1.4, Color(0.0, 0.0, 0.0, 0.34))
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			draw_circle(spot, float(projectile.radius) * 1.35, Color(1.0, 0.9, 0.45, 0.28))
 			draw_circle(spot, float(projectile.radius), Color("f7f2dc"))
-			draw_arc(spot, float(projectile.radius) * 0.72, _anim * 3.0, _anim * 3.0 + PI * 0.82, 24, Color("2389b8"), 5.0, true)
-			draw_arc(spot, float(projectile.radius) * 0.48, _anim * 3.0 + PI, _anim * 3.0 + PI * 1.82, 24, Color("d64e45"), 4.0, true)
+			draw_arc(spot, float(projectile.radius) * 0.72, _anim * 6.0, _anim * 6.0 + PI * 0.82, 24, Color("2389b8"), 6.0, true)
+			draw_arc(spot, float(projectile.radius) * 0.48, _anim * 6.0 + PI, _anim * 6.0 + PI * 1.82, 24, Color("d64e45"), 5.0, true)
 		else:
-			var spot: Vector2 = projectile.pos + Vector2(0.0, sin(_anim * 15.0) * 5.0)
-			draw_circle(spot, float(projectile.radius) * 1.6, Color(0.45, 1.0, 0.12, 0.22))
+			var spot: Vector2 = projectile.pos + Vector2(0.0, sin(_anim * 15.0) * 6.0)
+			var travel := Vector2(projectile.velocity)
+			if travel.length() > 1.0:
+				draw_line(spot, spot - travel.normalized() * 46.0, Color(0.6, 1.0, 0.2, 0.55), 8.0, true)
+			draw_circle(spot, float(projectile.radius) * 2.1, Color(0.45, 1.0, 0.12, 0.2))
+			draw_circle(spot, float(projectile.radius) * 1.35, Color(0.7, 1.0, 0.25, 0.35))
 			draw_circle(spot, float(projectile.radius), Color("98ed38"))
-			draw_circle(spot + Vector2(-5.0, -5.0), 5.0, Color("eaffab"))
+			draw_circle(spot + Vector2(-5.0, -5.0), 6.0, Color("eaffab"))
 	for actor in sim.enemies:
 		if actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "poison_windup":
-			var target: Vector2 = actor.target_pos
-			var pulse := 0.7 + 0.3 * sin(_anim * 18.0)
-			draw_circle(target, 52.0 + pulse * 12.0, Color(0.4, 1.0, 0.08, 0.12))
-			draw_arc(target, 68.0 + pulse * 14.0, 0.0, TAU, 48, Color(0.69, 1.0, 0.2, 0.88), 5.0, true)
-			draw_line(actor.pos, target, Color(0.62, 1.0, 0.18, 0.38), 3.0, true)
+			_draw_fan_warning(actor, Balance.POISON_FAN, Color(0.62, 1.0, 0.18, 0.7), Color(0.69, 1.0, 0.2, 0.9))
 		elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "volley_windup":
-			var target: Vector2 = actor.target_pos
-			draw_arc(target, 34.0 + sin(_anim * 16.0) * 8.0, 0.0, TAU, 40, Color(1.0, 0.78, 0.25, 0.9), 5.0, true)
-			draw_line(actor.pos, target, Color(1.0, 0.9, 0.55, 0.68), 4.0, true)
+			_draw_fan_warning(actor, Balance.VOLLEY_FAN, Color(1.0, 0.86, 0.4, 0.75), Color(1.0, 0.72, 0.22, 0.95))
 		elif actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "empower_windup":
 			var pulse := 0.82 + 0.18 * sin(_anim * 14.0)
-			draw_arc(actor.pos, 132.0 * pulse, 0.0, TAU, 56, Color(0.82, 1.0, 0.38, 0.78), 5.0, true)
-			draw_arc(actor.pos, 210.0 + sin(_anim * 9.0) * 10.0, _anim * 2.2, _anim * 2.2 + TAU * 0.72, 40, Color(0.95, 0.86, 0.32, 0.62), 4.0, true)
-			for i in 6:
-				var angle := _anim * 2.6 + float(i) * TAU / 6.0
-				var mote: Vector2 = Vector2(actor.pos) + Vector2.from_angle(angle) * (78.0 + sin(_anim * 11.0 + float(i)) * 14.0)
-				draw_circle(mote, 7.0, Color(0.96, 1.0, 0.55, 0.82))
+			draw_circle(actor.pos, 150.0 * pulse, Color(0.75, 1.0, 0.3, 0.08))
+			draw_arc(actor.pos, 148.0 * pulse, 0.0, TAU, 64, Color(0.82, 1.0, 0.38, 0.9), 7.0, true)
+			draw_arc(actor.pos, 230.0 + sin(_anim * 9.0) * 16.0, _anim * 2.2, _anim * 2.2 + TAU * 0.72, 48, Color(0.95, 0.86, 0.32, 0.75), 5.0, true)
+			draw_arc(actor.pos, 96.0 + sin(_anim * 12.0) * 8.0, -_anim * 3.0, -_anim * 3.0 + TAU * 0.4, 24, Color(1.0, 1.0, 0.7, 0.8), 4.0, true)
+			for i in 10:
+				var angle := _anim * 2.6 + float(i) * TAU / 10.0
+				var mote: Vector2 = Vector2(actor.pos) + Vector2.from_angle(angle) * (90.0 + sin(_anim * 11.0 + float(i)) * 22.0)
+				draw_circle(mote, 8.0, Color(0.96, 1.0, 0.55, 0.9))
 		elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_windup":
-			var direction: Vector2 = (actor.target_pos - actor.pos).normalized()
-			var side := direction.orthogonal() * 24.0
+			var aim: Vector2 = actor.target_pos - actor.pos
+			var direction := aim.normalized() if aim.length() > 0.01 else Vector2.RIGHT
+			var side := direction.orthogonal() * 28.0
 			for offset in [-1.0, 0.0, 1.0]:
-				draw_line(actor.pos + side * offset, actor.target_pos + side * offset, Color(1.0, 0.4, 0.23, 0.72 - absf(offset) * 0.15), 8.0 - absf(offset) * 2.0, true)
+				draw_line(actor.pos + side * offset, actor.target_pos + side * offset, Color(1.0, 0.35, 0.16, 0.8 - absf(offset) * 0.18), 12.0 - absf(offset) * 3.0, true)
+			var pulse := 0.7 + 0.3 * sin(_anim * 18.0)
+			draw_arc(actor.target_pos, 36.0 + pulse * 16.0, 0.0, TAU, 40, Color(1.0, 0.45, 0.2, 0.9), 5.0, true)
+			draw_arc(actor.pos, 48.0 + pulse * 10.0, 0.0, TAU, 32, Color(1.0, 0.7, 0.3, 0.7), 4.0, true)
+		elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_dash":
+			var aim: Vector2 = actor.target_pos - actor.pos
+			if aim.length() > 0.01:
+				var direction := aim.normalized()
+				var side := direction.orthogonal()
+				for i in 4:
+					var back := float(i) * 28.0
+					draw_line(actor.pos - direction * back + side * 18.0, actor.pos - direction * (back + 46.0) + side * 26.0, Color(1.0, 0.8, 0.45, 0.55 - float(i) * 0.1), 4.0, true)
+					draw_line(actor.pos - direction * back - side * 18.0, actor.pos - direction * (back + 46.0) - side * 26.0, Color(1.0, 0.55, 0.25, 0.5 - float(i) * 0.08), 4.0, true)
 		elif actor.kind == Balance.KIND_TEACHER and actor.attack_state == "slide_windup":
 			var aim: Vector2 = actor.target_pos - actor.pos
 			if aim.length() > 0.01:
@@ -484,12 +536,12 @@ func _draw() -> void:
 				max_w = 176.0
 			elif actor.kind == Balance.KIND_NIMOTON:
 				tex = art_nimoton
-				max_h = 320.0
-				max_w = 420.0
+				max_h = 240.0
+				max_w = 400.0
 			elif actor.kind == Balance.KIND_KASSEN:
 				tex = art_kassen
-				max_h = 280.0
-				max_w = 300.0
+				max_h = 220.0
+				max_w = 160.0
 			elif actor.kind == Balance.KIND_TEACHER:
 				tex = art_teacher
 				max_h = 210.0
@@ -818,32 +870,38 @@ func _enemy_pose(actor) -> Dictionary:
 	if actor.kind == Balance.KIND_FAST and not stunned:
 		lunge = Vector2(face * 22.0 * maxf(sin(phase), 0.0), 4.0)
 	if actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "poison_windup":
-		var charge := 0.5 + 0.5 * sin(float(actor.state_left) * 18.0)
-		hop = 8.0 + charge * 15.0
-		sx += charge * 0.16
-		sy -= charge * 0.22
+		var charge := 0.5 + 0.5 * sin(float(actor.state_left) * 22.0)
+		hop = 12.0 + charge * 26.0
+		sx += charge * 0.28
+		sy -= charge * 0.32
+		rot = face * charge * 0.18
 		face = -1.0 if actor.target_pos.x < actor.pos.x else 1.0
 	elif actor.kind == Balance.KIND_NIMOTON and actor.attack_state == "empower_windup":
-		var pulse := 0.5 + 0.5 * sin(float(actor.state_left) * 16.0)
-		sx += pulse * 0.22
-		sy -= pulse * 0.15
-		hop = pulse * 8.0
+		var pulse := 0.5 + 0.5 * sin(float(actor.state_left) * 20.0)
+		sx += pulse * 0.36
+		sy += pulse * 0.12
+		hop = pulse * 18.0
+		rot = sin(float(actor.state_left) * 24.0) * 0.12
 	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "volley_windup":
-		hop = 16.0 + absf(sin(float(actor.state_left) * 11.0)) * 18.0
-		rot = face * -0.18
+		hop = 28.0 + absf(sin(float(actor.state_left) * 14.0)) * 26.0
+		rot = face * -0.38
+		sx -= 0.08
+		sy += 0.16
 		face = -1.0 if actor.target_pos.x < actor.pos.x else 1.0
 	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_windup":
-		var crouch := clampf(1.0 - float(actor.state_left) / 0.68, 0.0, 1.0)
+		var crouch := clampf(1.0 - float(actor.state_left) / 0.55, 0.0, 1.0)
 		hop = 0.0
-		sy += crouch * 0.22
-		sx -= crouch * 0.1
-		rot = face * (-0.12 - crouch * 0.2)
+		sy += crouch * 0.34
+		sx -= crouch * 0.16
+		rot = face * (-0.2 - crouch * 0.42)
 		face = -1.0 if actor.target_pos.x < actor.pos.x else 1.0
 	elif actor.kind == Balance.KIND_KASSEN and actor.attack_state == "kick_dash":
 		var dash: Vector2 = actor.target_pos - actor.pos
 		if dash.length() > 0.01:
-			lunge = dash.normalized() * 120.0
-			rot = dash.angle() * 0.16
+			lunge = dash.normalized() * 168.0
+			rot = dash.angle() * 0.28
+			sx += 0.18
+			sy -= 0.12
 			face = -1.0 if dash.x < 0.0 else 1.0
 	elif actor.kind == Balance.KIND_TEACHER and actor.attack_state == "slide_windup":
 		var crouch := clampf(1.0 - float(actor.state_left) / 0.48, 0.0, 1.0)
@@ -1680,9 +1738,9 @@ func _intrusion_portrait(kind: String) -> Texture2D:
 
 func _intrusion_line(kind: String) -> String:
 	if kind == Balance.KIND_NIMOTON:
-		return "毒液 / 群れを強化"
+		return "毒液三発 / 群れを強化"
 	if kind == Balance.KIND_KASSEN:
-		return "バレーアタック / 強烈な蹴り"
+		return "三段サーブ / 強烈な蹴り"
 	return str(Balance.ENEMY_SPECIAL.get(kind, ""))
 
 
@@ -1695,10 +1753,22 @@ func _attack_hint() -> String:
 
 
 func _kassen_portrait() -> Texture2D:
-	var atlas := AtlasTexture.new()
-	atlas.atlas = art_kassen
-	atlas.region = Rect2(286.0, 190.0, 452.0, 640.0)
-	return atlas
+	return UiFont.cropped(ART_KASSEN)
+
+
+func _draw_fan_warning(actor, spreads: Array, line_color: Color, ring_color: Color) -> void:
+	var origin := Vector2(actor.pos)
+	var aim: Vector2 = actor.target_pos - origin
+	if aim.length() < 1.0:
+		aim = Vector2.RIGHT
+	var angle := aim.angle()
+	var reach := maxf(aim.length(), 120.0)
+	var pulse := 0.7 + 0.3 * sin(_anim * 18.0)
+	for spread in spreads:
+		var tip := origin + Vector2.from_angle(angle + float(spread)) * reach
+		draw_line(origin, tip, line_color, 5.0, true)
+		draw_circle(tip, 18.0 + pulse * 8.0, Color(ring_color.r, ring_color.g, ring_color.b, 0.16))
+		draw_arc(tip, 34.0 + pulse * 12.0, 0.0, TAU, 36, ring_color, 4.0, true)
 
 
 func _face_texture() -> Texture2D:

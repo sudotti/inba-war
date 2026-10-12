@@ -60,6 +60,10 @@ const UPGRADE_MAX := 5
 const KILL_CAP_NORMAL := 350
 const KILL_CAP_FAST := 180
 const KILL_CAP_TANK := 6
+const KILL_CAP_NIMOTON := 2
+const KILL_CAP_KASSEN := 2
+const KILL_CAP_TEACHER := 6
+const RANK_URL := "https://inba-war-rank.irori1997.workers.dev"
 
 const KIND_NORMAL := "normal"
 const KIND_FAST := "fast"
@@ -95,8 +99,8 @@ const ENEMY_DESCRIPTION := {
 	KIND_NORMAL: "数で迫る黒服。囲まれる前に距離を取れ。",
 	KIND_FAST: "一直線に突っ込む。進路を読んでかわす。",
 	KIND_TANK: "巨体と一撃が脅威。吹き飛ばしにくい。",
-	KIND_NIMOTON: "毒液で地面を侵し、手下を覚醒させる。",
-	KIND_KASSEN: "バレーボール弾と強烈な蹴りで襲う。",
+	KIND_NIMOTON: "毒液を三方にまき、手下を覚醒させる。",
+	KIND_KASSEN: "三段サーブと強烈な蹴りで襲う。",
 	KIND_TEACHER: "校庭に現れる非常勤。教鞭を振り回し、スライディングで突っ込む。",
 }
 const ENEMY_SPECIAL := {
@@ -106,8 +110,11 @@ const BOSS_POISON := "poison"
 const BOSS_VOLLEY := "volley"
 const BOSS_SPECIAL := {
 	KIND_NIMOTON: "毒液シャワー",
-	KIND_KASSEN: "バレーボール弾",
+	KIND_KASSEN: "三段サーブ",
 }
+# 画面の予告線と発射が同じ角度を使う。
+const POISON_FAN := [-0.4, 0.0, 0.4]
+const VOLLEY_FAN := [-0.28, 0.0, 0.28]
 const RAID_SPAWN_FIRST := 60.0
 const RAID_SPAWN_INTERVAL := 40.0
 const TANK_SPAWN_FIRST := 75.0
@@ -192,17 +199,17 @@ const ENEMIES := {
 		"knockback_scale": 0.35,
 	},
 	KIND_NIMOTON: {
-		"hp": 560,
-		"speed": 115.0,
-		"touch": 32,
+		"hp": 650,
+		"speed": 128.0,
+		"touch": 40,
 		"radius": 62.0,
 		"hurt_radius": 168.0,
 		"knockback_scale": 0.08,
 	},
 	KIND_KASSEN: {
-		"hp": 480,
-		"speed": 140.0,
-		"touch": 38,
+		"hp": 560,
+		"speed": 155.0,
+		"touch": 46,
 		"radius": 54.0,
 		"hurt_radius": 132.0,
 		"knockback_scale": 0.12,
@@ -360,6 +367,31 @@ static func kills_within_cap(normal: int, fast: int, tank: int) -> bool:
 		and fast >= 0 and fast <= KILL_CAP_FAST
 		and tank >= 0 and tank <= KILL_CAP_TANK
 	)
+
+
+static func rank_payload_ok(payload: Dictionary) -> bool:
+	var normal := int(payload.get("kills_normal", -1))
+	var fast := int(payload.get("kills_fast", -1))
+	var tank := int(payload.get("kills_tank", -1))
+	var nimoton := int(payload.get("kills_nimoton", 0))
+	var kassen := int(payload.get("kills_kassen", 0))
+	var teacher := int(payload.get("kills_teacher", 0))
+	if not kills_within_cap(normal, fast, tank):
+		return false
+	if nimoton < 0 or nimoton > KILL_CAP_NIMOTON or kassen < 0 or kassen > KILL_CAP_KASSEN:
+		return false
+	if teacher < 0 or teacher > KILL_CAP_TEACHER:
+		return false
+	if str(payload.get("version", "")) != VERSION:
+		return false
+	var who := str(payload.get("character", ""))
+	if who != CHAR_MASSA and who != CHAR_TAKETCHI and who != CHAR_KENNY:
+		return false
+	var name := str(payload.get("display_name", ""))
+	if name != "ななし" and not is_valid_display_name(name):
+		return false
+	var expect := score_from_kills(normal, fast, tank, nimoton, kassen, teacher)
+	return int(payload.get("score", -1)) == expect
 
 
 static func spawn_profile(elapsed: float) -> Dictionary:

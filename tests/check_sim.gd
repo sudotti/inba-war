@@ -170,8 +170,8 @@ func _specials() -> void:
 	nimo.enemies.append(nimo_actor)
 	var empowered = nimo.debug_place(Balance.KIND_NORMAL, nimo.player_pos + Vector2(70, 0), 12, 80.0)
 	nimo._empower_nearby(nimo_actor)
-	_near(empowered.speed, 186.0, "nimoton empowers minions")
-	_eq(empowered.touch, 9, "nimoton boosts contact damage")
+	_near(empowered.speed, 210.0, "nimoton empowers minions")
+	_eq(empowered.touch, 11, "nimoton boosts contact damage")
 	nimo._launch_boss_projectile(nimo_actor, Balance.BOSS_POISON, nimo.player_pos, 12, 1000.0)
 	nimo._move_boss_projectiles(0.2)
 	_true(nimo.player_hp < 100, "nimoton poison projectile hits")
@@ -182,6 +182,11 @@ func _specials() -> void:
 	var hp_before_poison: int = nimo.player_hp
 	nimo._update_poison_pools(0.05)
 	_true(nimo.player_hp < hp_before_poison, "poison pool damages player")
+	nimo_actor.attack_state = "poison_windup"
+	nimo_actor.state_left = 0.01
+	nimo_actor.target_pos = nimo.player_pos
+	nimo._move_boss(nimo_actor, 0.02)
+	_eq(nimo.boss_projectiles.size(), 3, "nimoton poison shower")
 
 	var kassen = BattleSim.new()
 	kassen.time = 5.0
@@ -192,7 +197,7 @@ func _specials() -> void:
 	kassen_actor.state_left = 0.01
 	kassen_actor.target_pos = kassen.player_pos
 	kassen._move_boss(kassen_actor, 0.02)
-	_eq(kassen.boss_projectiles.size(), 1, "kassen launches volleyball")
+	_eq(kassen.boss_projectiles.size(), 3, "kassen launches volleyball")
 	_eq(kassen.boss_projectiles[0].kind, Balance.BOSS_VOLLEY, "kassen ball type")
 	kassen_actor.attack_state = "kick_windup"
 	kassen_actor.state_left = 0.01
@@ -619,6 +624,8 @@ func _save() -> void:
 	_eq(str(store.data.pending_score.display_name), "ななし", "pending blank name")
 	_eq(str(store.data.pending_score.version), "0.1.0", "pending version")
 	_eq(str(store.data.pending_score.character), Balance.CHAR_MASSA, "pending character")
+	_eq(int(store.data.pending_score.kills_teacher), 0, "pending teacher")
+	_true(Balance.rank_payload_ok(store.data.pending_score), "pending can be sent")
 	var when := str(store.data.best_datetime)
 	var again: Dictionary = store.commit_run(summary)
 	_true(not bool(again.best_updated), "tie does not replace")

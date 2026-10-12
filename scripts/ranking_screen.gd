@@ -3,12 +3,17 @@ extends Control
 const UiFont = preload("res://scripts/ui_font.gd")
 
 var _rows: VBoxContainer
+var _note: Label
 var _main_margin: MarginContainer
 
 
 func _ready() -> void:
 	_build()
-	_refresh()
+	if not SaveStore.board_updated.is_connected(_on_board):
+		SaveStore.board_updated.connect(_on_board)
+	_note.text = "読み込み中"
+	SaveStore.flush_pending()
+	SaveStore.fetch_board()
 
 
 func _build() -> void:
@@ -59,7 +64,8 @@ func _build() -> void:
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(content)
 
-	content.add_child(UiFont.label("この端末の上位記録", 22, UiFont.BRASS))
+	_note = UiFont.label("みんなの自己ベスト", 22, UiFont.BRASS)
+	content.add_child(_note)
 
 	var heading := HBoxContainer.new()
 	heading.add_theme_constant_override("separation", 8)
@@ -73,11 +79,16 @@ func _build() -> void:
 	_add_heading(heading, "スコア")
 	_add_heading(heading, "記録日")
 
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	content.add_child(scroll)
+
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override("separation", 3)
-	_rows.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_child(_rows)
+	scroll.add_child(_rows)
 
 
 func _add_heading(row: HBoxContainer, text: String) -> void:
@@ -87,8 +98,20 @@ func _add_heading(row: HBoxContainer, text: String) -> void:
 	row.add_child(label)
 
 
-func _refresh() -> void:
-	var entries: Array = SaveStore.data.local_scores
+func _on_board(ok: bool, entries: Array) -> void:
+	if not is_inside_tree():
+		return
+	if not ok:
+		_note.text = "つながらない。次に開くと再送する"
+		_show([])
+		if _rows.get_child_count() > 0:
+			_rows.get_child(0).text = "通信できるまで空欄"
+		return
+	_note.text = "自己ベスト  %d人" % entries.size()
+	_show(entries)
+
+
+func _show(entries: Array) -> void:
 	for child in _rows.get_children():
 		_rows.remove_child(child)
 		child.free()
@@ -97,6 +120,7 @@ func _refresh() -> void:
 		_rows.add_child(UiFont.label("まだ記録がない", 30, UiFont.PAPER))
 		return
 
+	var mine := str(SaveStore.data.player_id)
 	for index in entries.size():
 		var entry: Dictionary = entries[index]
 		var row := HBoxContainer.new()
@@ -105,12 +129,14 @@ func _refresh() -> void:
 		row.custom_minimum_size.y = 54
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-		var color := UiFont.YELLOW if index == 0 else UiFont.PAPER
-		_add_cell(row, "%02d" % (index + 1), color)
-		_add_cell(row, str(entry.get("name", "ななし")), color)
+		var mine_row := str(entry.get("player_id", "")) == mine
+		var color := UiFont.BRASS if mine_row else (UiFont.YELLOW if index == 0 else UiFont.PAPER)
+		var rank := int(entry.get("rank", index + 1))
+		_add_cell(row, "%02d" % rank, color)
+		_add_cell(row, str(entry.get("display_name", entry.get("name", "ななし"))), color)
 		_add_cell(row, str(entry.get("character", "")), UiFont.CREAM)
 		_add_cell(row, "%d" % int(entry.get("score", 0)), color)
-		_add_cell(row, _short_date(str(entry.get("date", ""))), UiFont.CREAM)
+		_add_cell(row, _short_date(str(entry.get("achieved_at", entry.get("date", "")))), UiFont.CREAM)
 
 		_rows.add_child(row)
 

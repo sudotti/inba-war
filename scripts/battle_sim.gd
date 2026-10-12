@@ -384,13 +384,13 @@ func _move_boss(actor: Actor, dt: float) -> void:
 	if actor.attack_state == "kick_dash":
 		var dash := actor.target_pos - actor.pos
 		if dash.length() > 0.001:
-			actor.pos = _clamp_field(actor.pos + dash.normalized() * 590.0 * dt, actor.radius)
+			actor.pos = _clamp_field(actor.pos + dash.normalized() * 720.0 * dt, actor.radius)
 		if not actor.dash_hit and actor.pos.distance_to(player_pos) <= actor.radius + player_radius + 34.0:
 			actor.dash_hit = true
-			_boss_hit_player(38)
+			_boss_hit_player(48)
 			var away := player_pos - actor.pos
 			if away.length() > 0.001:
-				player_pos = _clamp_field(player_pos + away.normalized() * 86.0, player_radius)
+				player_pos = _clamp_field(player_pos + away.normalized() * 104.0, player_radius)
 		actor.state_left -= dt
 		if actor.state_left <= 0.0:
 			actor.attack_state = ""
@@ -407,23 +407,23 @@ func _move_boss(actor: Actor, dt: float) -> void:
 		actor.support_timer -= dt
 		if actor.support_timer <= 0.0:
 			actor.attack_state = "empower_windup"
-			actor.state_left = 0.9
+			actor.state_left = 0.75
 			return
 		if actor.attack_timer <= 0.0:
 			actor.attack_state = "poison_windup"
 			actor.target_pos = player_pos
-			actor.state_left = 0.72
+			actor.state_left = 0.58
 			return
 		_move_boss_range(actor, 190.0, dt)
 		return
 	if actor.attack_timer <= 0.0:
 		actor.target_pos = player_pos
-		if distance < 340.0 and rng.randf() < 0.58:
+		if distance < 360.0 and rng.randf() < 0.62:
 			actor.attack_state = "kick_windup"
-			actor.state_left = 0.68
+			actor.state_left = 0.55
 		else:
 			actor.attack_state = "volley_windup"
-			actor.state_left = 0.82
+			actor.state_left = 0.64
 		return
 	_move_boss_range(actor, 175.0, dt)
 
@@ -490,18 +490,18 @@ func _move_boss_range(actor: Actor, desired_range: float, dt: float) -> void:
 func _resolve_boss_action(actor: Actor) -> void:
 	match actor.attack_state:
 		"poison_windup":
-			_launch_boss_projectile(actor, Balance.BOSS_POISON, actor.target_pos, 20, 285.0)
-			actor.attack_timer = 2.4
+			_launch_aimed_fan(actor, Balance.BOSS_POISON, Balance.POISON_FAN, 24, 16, 330.0)
+			actor.attack_timer = 2.1
 		"empower_windup":
 			_empower_nearby(actor)
-			actor.support_timer = 7.2
-			actor.attack_timer = 1.4
+			actor.support_timer = 6.0
+			actor.attack_timer = 1.2
 		"volley_windup":
-			_launch_boss_projectile(actor, Balance.BOSS_VOLLEY, actor.target_pos, 27, 365.0)
-			actor.attack_timer = 2.7
+			_launch_aimed_fan(actor, Balance.BOSS_VOLLEY, Balance.VOLLEY_FAN, 34, 18, 440.0)
+			actor.attack_timer = 2.3
 		"kick_windup":
 			actor.attack_state = "kick_dash"
-			actor.state_left = 0.52
+			actor.state_left = 0.46
 			actor.dash_hit = false
 			return
 	actor.attack_state = ""
@@ -516,16 +516,37 @@ func _empower_nearby(boss: Actor) -> void:
 		if actor.pos.distance_to(boss.pos) > 560.0:
 			continue
 		if actor.empowered_left <= 0.0:
-			actor.speed = actor.base_speed * 1.55
-			actor.touch = ceili(float(actor.base_touch) * 1.5)
+			actor.speed = actor.base_speed * 1.75
+			actor.touch = ceili(float(actor.base_touch) * 1.7)
 		actor.empowered_left = 8.0
 
 
-func _launch_boss_projectile(boss: Actor, kind: String, target: Vector2, damage: int, speed: float) -> void:
+func _launch_aimed_fan(boss: Actor, kind: String, spreads: Array, center_damage: int, side_damage: int, speed: float) -> void:
+	var base := boss.target_pos - boss.pos
+	if base.length() < 0.001:
+		base = Vector2.RIGHT
+	var aim := base.angle()
+	var reach := maxf(base.length(), 160.0)
+	for spread in spreads:
+		var offset := float(spread)
+		var target := boss.pos + Vector2.from_angle(aim + offset) * reach
+		var damage := center_damage if absf(offset) < 0.001 else side_damage
+		var radius := 18.0
+		if kind == Balance.BOSS_VOLLEY:
+			radius = 26.0 if absf(offset) < 0.001 else 16.0
+		elif absf(offset) < 0.001:
+			radius = 22.0
+		_launch_boss_projectile(boss, kind, target, damage, speed, radius)
+
+
+func _launch_boss_projectile(boss: Actor, kind: String, target: Vector2, damage: int, speed: float, radius: float = -1.0) -> void:
 	var projectile := BossProjectile.new()
 	projectile.kind = kind
 	projectile.pos = boss.pos + Vector2(0.0, -boss.radius * 0.35)
-	projectile.radius = 20.0 if kind == Balance.BOSS_VOLLEY else 18.0
+	if radius > 0.0:
+		projectile.radius = radius
+	else:
+		projectile.radius = 22.0 if kind == Balance.BOSS_VOLLEY else 18.0
 	projectile.damage = damage
 	var direction := target - projectile.pos
 	if direction.length() < 0.001:
@@ -557,8 +578,8 @@ func _move_boss_projectiles(dt: float) -> void:
 func _add_poison_pool(pos: Vector2) -> void:
 	var pool := PoisonPool.new()
 	pool.pos = Vector2(pos)
-	pool.radius = 86.0
-	pool.life = 5.5
+	pool.radius = 98.0
+	pool.life = 6.2
 	pool.tick_left = 0.2
 	poison_pools.append(pool)
 
@@ -569,8 +590,8 @@ func _update_poison_pools(dt: float) -> void:
 		pool.life -= dt
 		pool.tick_left -= dt
 		if pool.life > 0.0 and player_pos.distance_to(pool.pos) <= pool.radius + player_radius and pool.tick_left <= 0.0:
-			_boss_hit_player(4)
-			pool.tick_left = 0.7
+			_boss_hit_player(5)
+			pool.tick_left = 0.65
 		if pool.life > 0.0:
 			keep.append(pool)
 	poison_pools = keep

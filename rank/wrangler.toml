@@ -1,0 +1,9 @@
+name = "inba-war-rank"
+main = "src/index.js"
+compatibility_date = "2026-10-12"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "inba-war-rank"
+database_id = "69bb5b7c-23d4-4503-8974-687bc9bd9e4d"

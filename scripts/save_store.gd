@@ -3,14 +3,20 @@ extends Node
 const Balance = preload("res://scripts/balance.gd")
 const DEFAULT_PATH := "user://inba_save_v3.json"
 
+signal board_updated(ok: bool, entries: Array)
+
 var data: Dictionary = {}
 var last_result: Dictionary = {}
 var path: String = DEFAULT_PATH
 var shop_return: String = "res://scenes/title.tscn"
+var _submit: HTTPRequest
+var _board: HTTPRequest
+var _board_again := false
 
 
 func _ready() -> void:
 	load_from(DEFAULT_PATH)
+	flush_pending()
 
 
 func load_from(file_path: String) -> void:
@@ -106,6 +112,7 @@ func commit_run(summary: Dictionary) -> Dictionary:
 			"kills_tank": int(summary.get("kills_tank", 0)),
 			"kills_nimoton": int(summary.get("kills_nimoton", 0)),
 			"kills_kassen": int(summary.get("kills_kassen", 0)),
+			"kills_teacher": int(summary.get("kills_teacher", 0)),
 			"character": str(summary.get("character", Balance.CHAR_MASSA)),
 			"version": Balance.VERSION,
 			"datetime": when,
@@ -119,6 +126,8 @@ func commit_run(summary: Dictionary) -> Dictionary:
 	data.unclaimed_run = out.duplicate(true)
 	last_result = out
 	_write()
+	if updated:
+		flush_pending()
 	return out
 
 
@@ -466,6 +475,85 @@ func _replace_file(src: String, dst: String) -> bool:
 	if src != dst and FileAccess.file_exists(src):
 		DirAccess.remove_absolute(src_abs)
 	return FileAccess.file_exists(dst)
+
+
+func flush_pending() -> void:
+	if not is_inside_tree():
+		return
+	var pending = data.get("pending_score", null)
+	if typeof(pending) != TYPE_DICTIONARY or _submit != null:
+		return
+	if not Balance.rank_payload_ok(pending):
+		return
+	_submit = HTTPRequest.new()
+	_submit.timeout = 12.0
+	add_child(_submit)
+	_submit.request_completed.connect(_on_submit_done)
+	var err := _submit.request(
+		Balance.RANK_URL + "/score",
+		PackedStringArray(["Content-Type: application/json", "Accept: application/json"]),
+		HTTPClient.METHOD_POST,
+		JSON.stringify(pending)
+	)
+	if err != OK:
+		_drop_request(_submit)
+		_submit = null
+
+
+func fetch_board() -> void:
+	if not is_inside_tree():
+		return
+	if _board != null:
+		_board_again = true
+		return
+	_board = HTTPRequest.new()
+	_board.timeout = 12.0
+	add_child(_board)
+	_board.request_completed.connect(_on_board_done)
+	var err := _board.request(
+		Balance.RANK_URL + "/board",
+		PackedStringArray(["Accept: application/json"]),
+		HTTPClient.METHOD_GET
+	)
+	if err != OK:
+		_drop_request(_board)
+		_board = null
+		board_updated.emit(false, [])
+
+
+func _on_submit_done(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	var parsed = JSON.parse_string(body.get_string_from_utf8())
+	var accepted := result == HTTPRequest.RESULT_SUCCESS and code == 200 and typeof(parsed) == TYPE_DICTIONARY and bool(parsed.get("ok", false))
+	var rejected := result == HTTPRequest.RESULT_SUCCESS and code == 400
+	if accepted or rejected:
+		data.pending_score = null
+		_write()
+	_drop_request(_submit)
+	_submit = null
+	if accepted:
+		fetch_board()
+
+
+func _on_board_done(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	var parsed = JSON.parse_string(body.get_string_from_utf8())
+	var entries: Array = []
+	var ok := result == HTTPRequest.RESULT_SUCCESS and code == 200 and typeof(parsed) == TYPE_DICTIONARY and bool(parsed.get("ok", false))
+	if ok and typeof(parsed.get("entries", null)) == TYPE_ARRAY:
+		entries = parsed.entries
+	_drop_request(_board)
+	_board = null
+	board_updated.emit(ok, entries)
+	if _board_again:
+		_board_again = false
+		fetch_board()
+
+
+func _drop_request(req: HTTPRequest) -> void:
+	if req == null:
+		return
+	if req.get_parent() == self:
+		remove_child(req)
+	req.queue_free()
 
 
 func _flush_web_save() -> void:

@@ -242,12 +242,7 @@ func _portrait_path(kind: String) -> String:
 
 
 func _portrait_texture(kind: String) -> Texture2D:
-	if kind == Balance.KIND_KASSEN:
-		var atlas := AtlasTexture.new()
-		atlas.atlas = load(_portrait_path(kind))
-		atlas.region = Rect2(286.0, 190.0, 452.0, 640.0)
-		return atlas
-	if kind == Balance.KIND_NIMOTON or kind == Balance.KIND_TEACHER:
+	if kind == Balance.KIND_KASSEN or kind == Balance.KIND_NIMOTON or kind == Balance.KIND_TEACHER:
 		return UiFont.cropped(_portrait_path(kind))
 	return load(_portrait_path(kind))
 

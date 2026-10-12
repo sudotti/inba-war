@@ -6,3 +6,5 @@ export.cfg
 *.bak
 /build/
 /docs/*.import
+
+/rank/.wrangler/
